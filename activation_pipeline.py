@@ -17,6 +17,7 @@ import sys
 from types import SimpleNamespace
 
 import torch
+import torch.multiprocessing as mp
 
 # Local imports
 sys.path.append("src/gcg")
@@ -205,6 +206,13 @@ def load_eval_sets():
 
 
 def main():
+    # Ensure CUDA works with multiprocessing
+    try:
+        mp.set_start_method("spawn", force=True)
+    except RuntimeError:
+        # start method was already set in this process; that's fine
+        pass
+
     args = parse_args()
     random.seed(args.seed)
     ensure_dir(args.output_dir)
