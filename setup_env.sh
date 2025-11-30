@@ -32,6 +32,17 @@ check_python() {
     return 0
 }
 
+install_system_deps() {
+    # Install build essentials and OpenSSL headers for tokenizers builds
+    if command -v apt-get >/dev/null 2>&1; then
+        echo "Installing system build dependencies (pkg-config, libssl-dev, build-essential, curl)..."
+        apt-get update -y
+        apt-get install -y pkg-config libssl-dev build-essential curl
+    else
+        echo "WARNING: apt-get not found; please install pkg-config, libssl-dev, build-essential, and curl manually."
+    fi
+}
+
 setup_venv() {
     if [ ! -d ".venv" ]; then
         echo "Creating virtualenv in .venv ..."
@@ -75,15 +86,7 @@ install_python_deps() {
 main() {
     check_python
 
-    # install system build deps (Ubuntu/Debian)
-    if command -v apt-get &>/dev/null; then
-        echo "Installing system build dependencies (pkg-config, libssl-dev)..."
-        sudo apt-get update
-        sudo apt-get install -y pkg-config libssl-dev
-    else
-        echo "WARNING: apt-get not found; please install pkg-config and OpenSSL dev headers manually if needed."
-    fi
-
+    install_system_deps
     setup_venv
 
     ensure_rust
