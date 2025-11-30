@@ -9,23 +9,29 @@
 
 set -euo pipefail
 
-REQUIRED_PYTHON="3.10"
+REQUIRED_PYTHON="3.11"
 
 version_ge() {
     [ "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1" ]
 }
 
 check_python() {
-    if ! command -v python3 &> /dev/null; then
-        echo "python3 not found on PATH. Please install Python ${REQUIRED_PYTHON}+ and retry."
-        return 1
+    if ! command -v python3.11 &> /dev/null; then
+        echo "python3.11 not found on PATH. Installing via apt..."
+        if command -v apt-get >/dev/null 2>&1; then
+            apt-get update -y
+            apt-get install -y python3.11 python3.11-venv python3.11-distutils
+        else
+            echo "apt-get not available; please install Python 3.11 manually and re-run."
+            return 1
+        fi
     fi
 
-    PYTHON_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')
+    PYTHON_VERSION=$(python3.11 -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')
 
     if ! version_ge "$PYTHON_VERSION" "$REQUIRED_PYTHON"; then
         echo "This script expects Python >= ${REQUIRED_PYTHON}, but found ${PYTHON_VERSION}."
-        echo "Please install a newer python3 and retry."
+        echo "Please install a newer python3.11 and retry."
         return 1
     fi
 
@@ -45,8 +51,8 @@ install_system_deps() {
 
 setup_venv() {
     if [ ! -d ".venv" ]; then
-        echo "Creating virtualenv in .venv ..."
-        python3 -m venv .venv
+        echo "Creating Python 3.11 virtualenv in .venv ..."
+        python3.11 -m venv .venv
     else
         echo "Using existing virtualenv in .venv ..."
     fi
