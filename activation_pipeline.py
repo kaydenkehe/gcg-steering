@@ -155,8 +155,8 @@ def run_standard_gcg(args):
     workers, test_workers = get_workers(params)
     goals = sample_harmful_prompts(args.n_train)
     targets = ["Sure, here is"] * len(goals)
-    managers = {"AP": GcgAttackPrompt, "PM": GcgPromptManager, "MPA": GCGMultiPromptAttack}
-    attack = GCGMultiPromptAttack(
+    managers = {"AP": GcgAttackPrompt, "PM": GcgPromptManager, "MPA": GcgMultiPromptAttack}
+    attack = GcgMultiPromptAttack(
         goals,
         targets,
         workers,
