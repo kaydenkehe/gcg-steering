@@ -163,7 +163,7 @@ class GCGMultiPromptAttack(MultiPromptAttack):
             for j, cand in enumerate(control_cands):
                 # Looping through the prompts at this level is less elegant, but
                 # we can manage VRAM better this way
-                progress = tqdm(range(len(self.prompts[0])), total=len(self.prompts[0])) if verbose else enumerate(self.prompts[0])
+                progress = tqdm(range(len(self.prompts[0])), total=len(self.prompts[0])) if verbose else range(len(self.prompts[0]))
                 for i in progress:
                     for k, worker in enumerate(self.workers):
                         worker(self.prompts[k][i], "logits", worker.model, cand, return_ids=True)
