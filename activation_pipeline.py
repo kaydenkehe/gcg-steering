@@ -68,7 +68,7 @@ def parse_args():
     p.add_argument("--disable-llamaguard", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--device", default="cuda:0")
     p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--harmless-limit", type=int, default=50, help="Max harmless/harmful prompts to evaluate (use 0 for all)")
+    p.add_argument("--harmless-limit", type=int, default=100, help="Max harmless/harmful prompts to evaluate (use 0 for all)")
     return p.parse_args()
 
 
