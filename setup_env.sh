@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 
 # Simple environment setup for the gcg-steering project.
+# - Installs system build deps needed for tokenizers (pkg-config, OpenSSL dev)
 # - Creates a local virtualenv (.venv) with python3
 # - Ensures pip is up to date
-# - Installs Rust (via rustup) if not present (needed to build tokenizers)
+# - Installs Rust (via rustup) if not present (needed to build tokenizers if no wheel)
 # - Installs Python dependencies from requirements.txt
 
 set -euo pipefail
@@ -74,6 +75,15 @@ install_python_deps() {
 main() {
     check_python
 
+    # install system build deps (Ubuntu/Debian)
+    if command -v apt-get &>/dev/null; then
+        echo "Installing system build dependencies (pkg-config, libssl-dev)..."
+        sudo apt-get update
+        sudo apt-get install -y pkg-config libssl-dev
+    else
+        echo "WARNING: apt-get not found; please install pkg-config and OpenSSL dev headers manually if needed."
+    fi
+
     setup_venv
 
     ensure_rust
@@ -87,4 +97,3 @@ main() {
 }
 
 main "$@"
-
