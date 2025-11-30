@@ -55,7 +55,9 @@ def token_gradients_activation(model, input_ids, input_slice, pos, layer, direct
 
     direction = direction.to(hidden)
     proj = torch.dot(hidden[idx], direction)
-    proj.backward()
+    # Minimize projection magnitude (alignment with ablation: push projection toward zero)
+    obj = proj ** 2
+    obj.backward()
 
     grad = one_hot.grad.clone()
     del embeds, full_embeds, input_embeds, one_hot, hidden, captured
@@ -148,8 +150,9 @@ class ActivationAttackPrompt(AttackPrompt):
         idxs = torch.tensor(idxs, device=activations.device)
 
         direction = direction.to(activations)
+        # Return squared projection magnitudes so loss encourages projection -> 0
         scores = torch.stack(
-            [torch.dot(activations[b, idxs[b], :], direction) for b in range(activations.shape[0])]
+            [(torch.dot(activations[b, idxs[b], :], direction) ** 2) for b in range(activations.shape[0])]
         )
 
         del ids, locs, test_ids, activations, captured
