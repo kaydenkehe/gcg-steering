@@ -11,7 +11,6 @@ pandas>=2.0
 tqdm>=4.66
 
 datasets>=2.19.0         # for evaluate_loss (Pile/Alpaca) in refusal_direction
-vllm==0.5.0              # for HarmBench classifier in evaluate_jailbreak
 litellm>=1.40.0          # for LlamaGuard2 calls
 
 einops>=0.8.0
