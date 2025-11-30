@@ -41,7 +41,8 @@ def token_gradients_activation(model, input_ids, input_slice, pos, layer, direct
     captured = {}
 
     def pre_hook(module, hook_input):
-        captured["act"] = hook_input[0].detach()
+        # Keep gradient flow for the control tokens; do not detach.
+        captured["act"] = hook_input[0]
 
     handle = model.model.layers[layer].register_forward_pre_hook(pre_hook)
     _ = model(inputs_embeds=full_embeds)
