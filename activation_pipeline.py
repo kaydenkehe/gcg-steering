@@ -68,7 +68,7 @@ def parse_args():
     p.add_argument("--disable-llamaguard", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--device", default="cuda:0")
     p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--harmless-limit", type=int, default=72, help="Max harmless prompts to evaluate (use 0 for all)")
+    p.add_argument("--harmless-limit", type=int, default=50, help="Max harmless/harmful prompts to evaluate (use 0 for all)")
     return p.parse_args()
 
 
@@ -203,7 +203,9 @@ def generate_completions(model_base, dataset, suffix=None, fwd_pre_hooks=None, f
 def load_eval_sets(harmless_limit: int = 0):
     harmful_eval = load_dataset_split(harmtype="harmful", split="test")
     harmless_eval = load_dataset_split(harmtype="harmless", split="test")
+    # Apply the limit symmetrically so harmful and harmless use the same number of prompts
     if harmless_limit and harmless_limit > 0:
+        harmful_eval = harmful_eval[:harmless_limit]
         harmless_eval = harmless_eval[:harmless_limit]
     return harmful_eval, harmless_eval
 

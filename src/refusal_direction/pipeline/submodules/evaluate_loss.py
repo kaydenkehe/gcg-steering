@@ -117,8 +117,12 @@ def compute_loss_over_dataset(model, tokenizer, batch_iterator, n_batches=256, f
 
         batch_idx += 1
     
-    ce_loss = accumulated_loss / accumulated_n_tokens
-    perplexity = torch.exp(ce_loss)    
+    if accumulated_n_tokens.item() == 0:
+        ce_loss = torch.tensor(float("nan"), device=model.device)
+        perplexity = torch.tensor(float("nan"), device=model.device)
+    else:
+        ce_loss = accumulated_loss / accumulated_n_tokens
+        perplexity = torch.exp(ce_loss)
 
     return ce_loss, perplexity, accumulated_n_tokens
 
