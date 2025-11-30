@@ -16,8 +16,7 @@ cargo: ./debug_tokenizers.sh: line 26: cargo: command not found
 missing
 rustc: ./debug_tokenizers.sh: line 27: rustc: command not found
 missing
-pkg-config openssl: ./debug_tokenizers.sh: line 28: pkg-config: command not found
-missing
+pkg-config openssl: 3.0.13
 
 === VERBOSE TOKENIZERS INSTALL (no deps) ===
 Using pip 25.2 from /usr/local/lib/python3.12/dist-packages/pip (python 3.12)
@@ -43,14 +42,14 @@ Collecting tokenizers<0.14,>=0.13
   Using cached setuptools_rust-1.12.0-py3-none-any.whl (28 kB)
   Using cached semantic_version-2.10.0-py2.py3-none-any.whl (15 kB)
   Installing collected packages: wheel, setuptools, semantic_version, setuptools-rust
-    Creating /tmp/pip-build-env-tju9p7f1/overlay/local/bin
-    changing mode of /tmp/pip-build-env-tju9p7f1/overlay/local/bin/wheel to 755
+    Creating /tmp/pip-build-env-hkp43_0p/overlay/local/bin
+    changing mode of /tmp/pip-build-env-hkp43_0p/overlay/local/bin/wheel to 755
 
   Successfully installed semantic_version-2.10.0 setuptools-80.9.0 setuptools-rust-1.12.0 wheel-0.45.1
   Installing build dependencies: finished with status 'done'
   Getting requirements to build wheel: started
   Running command Getting requirements to build wheel
-  /tmp/pip-build-env-tju9p7f1/overlay/local/lib/python3.12/dist-packages/setuptools/dist.py:759: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+  /tmp/pip-build-env-hkp43_0p/overlay/local/lib/python3.12/dist-packages/setuptools/dist.py:759: SetuptoolsDeprecationWarning: License classifiers are deprecated.
   !!
 
           ********************************************************************************
@@ -76,7 +75,7 @@ Collecting tokenizers<0.14,>=0.13
   Getting requirements to build wheel: finished with status 'done'
   Preparing metadata (pyproject.toml): started
   Running command Preparing metadata (pyproject.toml)
-  /tmp/pip-build-env-tju9p7f1/overlay/local/lib/python3.12/dist-packages/setuptools/dist.py:759: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+  /tmp/pip-build-env-hkp43_0p/overlay/local/lib/python3.12/dist-packages/setuptools/dist.py:759: SetuptoolsDeprecationWarning: License classifiers are deprecated.
   !!
 
           ********************************************************************************
@@ -90,23 +89,23 @@ Collecting tokenizers<0.14,>=0.13
   !!
     self._finalize_license_expression()
   running dist_info
-  creating /tmp/pip-modern-metadata-wogi0lgh/tokenizers.egg-info
-  writing /tmp/pip-modern-metadata-wogi0lgh/tokenizers.egg-info/PKG-INFO
-  writing dependency_links to /tmp/pip-modern-metadata-wogi0lgh/tokenizers.egg-info/dependency_links.txt
-  writing requirements to /tmp/pip-modern-metadata-wogi0lgh/tokenizers.egg-info/requires.txt
-  writing top-level names to /tmp/pip-modern-metadata-wogi0lgh/tokenizers.egg-info/top_level.txt
-  writing manifest file '/tmp/pip-modern-metadata-wogi0lgh/tokenizers.egg-info/SOURCES.txt'
-  reading manifest file '/tmp/pip-modern-metadata-wogi0lgh/tokenizers.egg-info/SOURCES.txt'
+  creating /tmp/pip-modern-metadata-uhb3uxf3/tokenizers.egg-info
+  writing /tmp/pip-modern-metadata-uhb3uxf3/tokenizers.egg-info/PKG-INFO
+  writing dependency_links to /tmp/pip-modern-metadata-uhb3uxf3/tokenizers.egg-info/dependency_links.txt
+  writing requirements to /tmp/pip-modern-metadata-uhb3uxf3/tokenizers.egg-info/requires.txt
+  writing top-level names to /tmp/pip-modern-metadata-uhb3uxf3/tokenizers.egg-info/top_level.txt
+  writing manifest file '/tmp/pip-modern-metadata-uhb3uxf3/tokenizers.egg-info/SOURCES.txt'
+  reading manifest file '/tmp/pip-modern-metadata-uhb3uxf3/tokenizers.egg-info/SOURCES.txt'
   reading manifest template 'MANIFEST.in'
   warning: no files found matching '../../LICENSE'
   warning: no previously-included files matching '*' found under directory 'tokenizers-lib/target'
-  writing manifest file '/tmp/pip-modern-metadata-wogi0lgh/tokenizers.egg-info/SOURCES.txt'
-  creating '/tmp/pip-modern-metadata-wogi0lgh/tokenizers-0.13.3.dist-info'
+  writing manifest file '/tmp/pip-modern-metadata-uhb3uxf3/tokenizers.egg-info/SOURCES.txt'
+  creating '/tmp/pip-modern-metadata-uhb3uxf3/tokenizers-0.13.3.dist-info'
   Preparing metadata (pyproject.toml): finished with status 'done'
 Building wheels for collected packages: tokenizers
   Building wheel for tokenizers (pyproject.toml): started
   Running command Building wheel for tokenizers (pyproject.toml)
-  /tmp/pip-build-env-tju9p7f1/overlay/local/lib/python3.12/dist-packages/setuptools/dist.py:759: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+  /tmp/pip-build-env-hkp43_0p/overlay/local/lib/python3.12/dist-packages/setuptools/dist.py:759: SetuptoolsDeprecationWarning: License classifiers are deprecated.
   !!
 
           ********************************************************************************
@@ -175,8 +174,8 @@ Building wheels for collected packages: tokenizers
   ╰─> See above for output.
   
   note: This error originates from a subprocess, and is likely not a problem with pip.
-  full command: /usr/bin/python3.12 /usr/local/lib/python3.12/dist-packages/pip/_vendor/pyproject_hooks/_in_process/_in_process.py build_wheel /tmp/tmpsvf1bfgg
-  cwd: /tmp/pip-install-ootmojh2/tokenizers_7cbc957208774676b7904bf8002c498d
+  full command: /usr/bin/python3.12 /usr/local/lib/python3.12/dist-packages/pip/_vendor/pyproject_hooks/_in_process/_in_process.py build_wheel /tmp/tmpzldzo_qz
+  cwd: /tmp/pip-install-dh0hcy8e/tokenizers_f00111162ca24a618170625491784414
   Building wheel for tokenizers (pyproject.toml): finished with status 'error'
   ERROR: Failed building wheel for tokenizers
 Failed to build tokenizers
