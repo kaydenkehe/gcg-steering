@@ -30,7 +30,7 @@ from llm_attacks.activation_gcg import (
 )
 from llm_attacks.gcg import AttackPrompt as GcgAttackPrompt
 from llm_attacks.gcg import PromptManager as GcgPromptManager
-from llm_attacks.gcg import GCGMultiPromptAttack
+from llm_attacks.gcg import MultiPromptAttack as GcgMultiPromptAttack
 
 from dataset.load_dataset import load_dataset_split
 from pipeline.model_utils.llama2_model import Llama2Model
