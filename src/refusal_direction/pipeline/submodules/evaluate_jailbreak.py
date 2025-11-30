@@ -6,8 +6,15 @@ import numpy as np
 
 from transformers import AutoTokenizer
 import torch
-import litellm
 import time
+
+# litellm is optional; used only for LlamaGuard2 eval. Handle absence gracefully.
+try:
+    import litellm  # type: ignore
+    _HAS_LITELLM = True
+except ImportError:
+    litellm = None
+    _HAS_LITELLM = False
 
 try:
     from vllm import LLM, SamplingParams
@@ -131,10 +138,8 @@ def substring_matching_judge_fn(completion: str, refusal_substrings: List[str]=_
     return any([refusal_substring.lower() in completion.lower() for refusal_substring in refusal_substrings])
 
 def llamaguard2_judge_fn(prompts: List[str], responses: List[str]) -> List[int]:
-    try:
-        import litellm  # noqa: F401
-    except ImportError as e:
-        raise RuntimeError("litellm is required for LlamaGuard2 evaluation. Install litellm to use this metric.") from e
+    if not _HAS_LITELLM:
+        raise RuntimeError("litellm is required for LlamaGuard2 evaluation. Install litellm to use this metric.")
 
     assert os.environ.get("TOGETHER_API_KEY", None) is not None, "TOGETHER_API_KEY environment variable must be set to run jailbreakbench evaluation."
 
