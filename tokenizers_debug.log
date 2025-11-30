@@ -1,0 +1,186 @@
+=== PYTHON / PLATFORM ===
+python: 3.12.3 (main, Aug 14 2025, 17:47:21) [GCC 13.3.0]
+platform: Linux x86_64
+
+=== PIP TOKENIZERS VERSIONS (first 40) ===
+tokenizers (0.22.1)
+Available versions: 0.22.1, 0.22.0, 0.21.4, 0.21.2, 0.21.1, 0.21.0, 0.20.3, 0.20.2, 0.20.1, 0.20.0, 0.19.1, 0.19.0, 0.15.2, 0.15.1, 0.15.0, 0.14.1, 0.14.0, 0.13.3, 0.13.2, 0.13.1, 0.13.0, 0.12.1, 0.11.6, 0.11.5, 0.11.4, 0.11.3, 0.11.2, 0.11.1, 0.11.0, 0.10.3, 0.10.2, 0.10.1, 0.10.0, 0.9.4, 0.9.3, 0.9.2, 0.9.1, 0.9.0, 0.8.1, 0.8.0, 0.7.0, 0.6.0, 0.5.2, 0.5.1, 0.5.0, 0.4.2, 0.4.1, 0.4.0, 0.3.0, 0.2.1, 0.2.0, 0.1.1, 0.1.0, 0.0.13, 0.0.12, 0.0.11, 0.0.10, 0.0.9, 0.0.8, 0.0.7, 0.0.6, 0.0.5, 0.0.4, 0.0.3, 0.0.2
+
+=== TRY WHEEL DOWNLOAD (tokenizers>=0.13,<0.14) ===
+ERROR: Ignored the following yanked versions: 0.20.4
+ERROR: Could not find a version that satisfies the requirement tokenizers<0.14,>=0.13 (from versions: 0.14.0, 0.14.1, 0.15.0, 0.15.1, 0.15.2, 0.19.0, 0.19.1, 0.20.0, 0.20.1rc1, 0.20.1, 0.20.2, 0.20.3rc0, 0.20.3, 0.20.4rc0, 0.21.0rc0, 0.21.0, 0.21.1rc0, 0.21.1, 0.21.2rc0, 0.21.2, 0.21.4, 0.22.0, 0.22.1rc0, 0.22.1)
+ERROR: No matching distribution found for tokenizers<0.14,>=0.13
+
+=== TOOLCHAIN CHECK ===
+cargo: ./debug_tokenizers.sh: line 26: cargo: command not found
+missing
+rustc: ./debug_tokenizers.sh: line 27: rustc: command not found
+missing
+pkg-config openssl: ./debug_tokenizers.sh: line 28: pkg-config: command not found
+missing
+
+=== VERBOSE TOKENIZERS INSTALL (no deps) ===
+Using pip 25.2 from /usr/local/lib/python3.12/dist-packages/pip (python 3.12)
+Collecting tokenizers<0.14,>=0.13
+  Using cached tokenizers-0.13.3.tar.gz (314 kB)
+  Installing build dependencies: started
+  Running command pip subprocess to install build dependencies
+  Using pip 25.2 from /usr/local/lib/python3.12/dist-packages/pip (python 3.12)
+  Collecting setuptools
+    Obtaining dependency information for setuptools from https://files.pythonhosted.org/packages/a3/dc/17031897dae0efacfea57dfd3a82fdd2a2aeb58e0ff71b77b87e44edc772/setuptools-80.9.0-py3-none-any.whl.metadata
+    Using cached setuptools-80.9.0-py3-none-any.whl.metadata (6.6 kB)
+  Collecting wheel
+    Obtaining dependency information for wheel from https://files.pythonhosted.org/packages/0b/2c/87f3254fd8ffd29e4c02732eee68a83a1d3c346ae39bc6822dcbcb697f2b/wheel-0.45.1-py3-none-any.whl.metadata
+    Using cached wheel-0.45.1-py3-none-any.whl.metadata (2.3 kB)
+  Collecting setuptools-rust
+    Obtaining dependency information for setuptools-rust from https://files.pythonhosted.org/packages/f9/7b/d05b1778f2d4e354d103e3421c6267d923032fefcc5ca5b7df0cb21cefd0/setuptools_rust-1.12.0-py3-none-any.whl.metadata
+    Using cached setuptools_rust-1.12.0-py3-none-any.whl.metadata (9.6 kB)
+  Collecting semantic_version<3,>=2.8.2 (from setuptools-rust)
+    Obtaining dependency information for semantic_version<3,>=2.8.2 from https://files.pythonhosted.org/packages/6a/23/8146aad7d88f4fcb3a6218f41a60f6c2d4e3a72de72da1825dc7c8f7877c/semantic_version-2.10.0-py2.py3-none-any.whl.metadata
+    Using cached semantic_version-2.10.0-py2.py3-none-any.whl.metadata (9.7 kB)
+  Using cached setuptools-80.9.0-py3-none-any.whl (1.2 MB)
+  Using cached wheel-0.45.1-py3-none-any.whl (72 kB)
+  Using cached setuptools_rust-1.12.0-py3-none-any.whl (28 kB)
+  Using cached semantic_version-2.10.0-py2.py3-none-any.whl (15 kB)
+  Installing collected packages: wheel, setuptools, semantic_version, setuptools-rust
+    Creating /tmp/pip-build-env-tju9p7f1/overlay/local/bin
+    changing mode of /tmp/pip-build-env-tju9p7f1/overlay/local/bin/wheel to 755
+
+  Successfully installed semantic_version-2.10.0 setuptools-80.9.0 setuptools-rust-1.12.0 wheel-0.45.1
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Running command Getting requirements to build wheel
+  /tmp/pip-build-env-tju9p7f1/overlay/local/lib/python3.12/dist-packages/setuptools/dist.py:759: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+  !!
+
+          ********************************************************************************
+          Please consider removing the following classifiers in favor of a SPDX license expression:
+
+          License :: OSI Approved :: Apache Software License
+
+          See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+          ********************************************************************************
+
+  !!
+    self._finalize_license_expression()
+  running egg_info
+  writing py_src/tokenizers.egg-info/PKG-INFO
+  writing dependency_links to py_src/tokenizers.egg-info/dependency_links.txt
+  writing requirements to py_src/tokenizers.egg-info/requires.txt
+  writing top-level names to py_src/tokenizers.egg-info/top_level.txt
+  reading manifest file 'py_src/tokenizers.egg-info/SOURCES.txt'
+  reading manifest template 'MANIFEST.in'
+  warning: no files found matching '../../LICENSE'
+  warning: no previously-included files matching '*' found under directory 'tokenizers-lib/target'
+  writing manifest file 'py_src/tokenizers.egg-info/SOURCES.txt'
+  Getting requirements to build wheel: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Running command Preparing metadata (pyproject.toml)
+  /tmp/pip-build-env-tju9p7f1/overlay/local/lib/python3.12/dist-packages/setuptools/dist.py:759: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+  !!
+
+          ********************************************************************************
+          Please consider removing the following classifiers in favor of a SPDX license expression:
+
+          License :: OSI Approved :: Apache Software License
+
+          See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+          ********************************************************************************
+
+  !!
+    self._finalize_license_expression()
+  running dist_info
+  creating /tmp/pip-modern-metadata-wogi0lgh/tokenizers.egg-info
+  writing /tmp/pip-modern-metadata-wogi0lgh/tokenizers.egg-info/PKG-INFO
+  writing dependency_links to /tmp/pip-modern-metadata-wogi0lgh/tokenizers.egg-info/dependency_links.txt
+  writing requirements to /tmp/pip-modern-metadata-wogi0lgh/tokenizers.egg-info/requires.txt
+  writing top-level names to /tmp/pip-modern-metadata-wogi0lgh/tokenizers.egg-info/top_level.txt
+  writing manifest file '/tmp/pip-modern-metadata-wogi0lgh/tokenizers.egg-info/SOURCES.txt'
+  reading manifest file '/tmp/pip-modern-metadata-wogi0lgh/tokenizers.egg-info/SOURCES.txt'
+  reading manifest template 'MANIFEST.in'
+  warning: no files found matching '../../LICENSE'
+  warning: no previously-included files matching '*' found under directory 'tokenizers-lib/target'
+  writing manifest file '/tmp/pip-modern-metadata-wogi0lgh/tokenizers.egg-info/SOURCES.txt'
+  creating '/tmp/pip-modern-metadata-wogi0lgh/tokenizers-0.13.3.dist-info'
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: tokenizers
+  Building wheel for tokenizers (pyproject.toml): started
+  Running command Building wheel for tokenizers (pyproject.toml)
+  /tmp/pip-build-env-tju9p7f1/overlay/local/lib/python3.12/dist-packages/setuptools/dist.py:759: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+  !!
+
+          ********************************************************************************
+          Please consider removing the following classifiers in favor of a SPDX license expression:
+
+          License :: OSI Approved :: Apache Software License
+
+          See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+          ********************************************************************************
+
+  !!
+    self._finalize_license_expression()
+  running bdist_wheel
+  running build
+  running build_py
+  creating build/lib.linux-x86_64-cpython-312/tokenizers
+  copying py_src/tokenizers/__init__.py -> build/lib.linux-x86_64-cpython-312/tokenizers
+  creating build/lib.linux-x86_64-cpython-312/tokenizers/models
+  copying py_src/tokenizers/models/__init__.py -> build/lib.linux-x86_64-cpython-312/tokenizers/models
+  creating build/lib.linux-x86_64-cpython-312/tokenizers/decoders
+  copying py_src/tokenizers/decoders/__init__.py -> build/lib.linux-x86_64-cpython-312/tokenizers/decoders
+  creating build/lib.linux-x86_64-cpython-312/tokenizers/normalizers
+  copying py_src/tokenizers/normalizers/__init__.py -> build/lib.linux-x86_64-cpython-312/tokenizers/normalizers
+  creating build/lib.linux-x86_64-cpython-312/tokenizers/pre_tokenizers
+  copying py_src/tokenizers/pre_tokenizers/__init__.py -> build/lib.linux-x86_64-cpython-312/tokenizers/pre_tokenizers
+  creating build/lib.linux-x86_64-cpython-312/tokenizers/processors
+  copying py_src/tokenizers/processors/__init__.py -> build/lib.linux-x86_64-cpython-312/tokenizers/processors
+  creating build/lib.linux-x86_64-cpython-312/tokenizers/trainers
+  copying py_src/tokenizers/trainers/__init__.py -> build/lib.linux-x86_64-cpython-312/tokenizers/trainers
+  creating build/lib.linux-x86_64-cpython-312/tokenizers/implementations
+  copying py_src/tokenizers/implementations/__init__.py -> build/lib.linux-x86_64-cpython-312/tokenizers/implementations
+  copying py_src/tokenizers/implementations/base_tokenizer.py -> build/lib.linux-x86_64-cpython-312/tokenizers/implementations
+  copying py_src/tokenizers/implementations/bert_wordpiece.py -> build/lib.linux-x86_64-cpython-312/tokenizers/implementations
+  copying py_src/tokenizers/implementations/byte_level_bpe.py -> build/lib.linux-x86_64-cpython-312/tokenizers/implementations
+  copying py_src/tokenizers/implementations/char_level_bpe.py -> build/lib.linux-x86_64-cpython-312/tokenizers/implementations
+  copying py_src/tokenizers/implementations/sentencepiece_bpe.py -> build/lib.linux-x86_64-cpython-312/tokenizers/implementations
+  copying py_src/tokenizers/implementations/sentencepiece_unigram.py -> build/lib.linux-x86_64-cpython-312/tokenizers/implementations
+  creating build/lib.linux-x86_64-cpython-312/tokenizers/tools
+  copying py_src/tokenizers/tools/__init__.py -> build/lib.linux-x86_64-cpython-312/tokenizers/tools
+  copying py_src/tokenizers/tools/visualizer.py -> build/lib.linux-x86_64-cpython-312/tokenizers/tools
+  copying py_src/tokenizers/__init__.pyi -> build/lib.linux-x86_64-cpython-312/tokenizers
+  copying py_src/tokenizers/models/__init__.pyi -> build/lib.linux-x86_64-cpython-312/tokenizers/models
+  copying py_src/tokenizers/decoders/__init__.pyi -> build/lib.linux-x86_64-cpython-312/tokenizers/decoders
+  copying py_src/tokenizers/normalizers/__init__.pyi -> build/lib.linux-x86_64-cpython-312/tokenizers/normalizers
+  copying py_src/tokenizers/pre_tokenizers/__init__.pyi -> build/lib.linux-x86_64-cpython-312/tokenizers/pre_tokenizers
+  copying py_src/tokenizers/processors/__init__.pyi -> build/lib.linux-x86_64-cpython-312/tokenizers/processors
+  copying py_src/tokenizers/trainers/__init__.pyi -> build/lib.linux-x86_64-cpython-312/tokenizers/trainers
+  copying py_src/tokenizers/tools/visualizer-styles.css -> build/lib.linux-x86_64-cpython-312/tokenizers/tools
+  running build_ext
+  running build_rust
+  error: can't find Rust compiler
+
+  If you are using an outdated pip version, it is possible a prebuilt wheel is available for this package but pip is not able to install from it. Installing from the wheel would avoid the need for a Rust compiler.
+
+  To update pip, run:
+
+      pip install --upgrade pip
+
+  and then retry package installation.
+
+  If you did intend to build this package from source, try installing a Rust compiler from your system package manager and ensure it is on the PATH during installation. Alternatively, rustup (available at https://rustup.rs) is the recommended way to download and update the Rust compiler toolchain.
+  error: subprocess-exited-with-error
+  
+  × Building wheel for tokenizers (pyproject.toml) did not run successfully.
+  │ exit code: 1
+  ╰─> See above for output.
+  
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+  full command: /usr/bin/python3.12 /usr/local/lib/python3.12/dist-packages/pip/_vendor/pyproject_hooks/_in_process/_in_process.py build_wheel /tmp/tmpsvf1bfgg
+  cwd: /tmp/pip-install-ootmojh2/tokenizers_7cbc957208774676b7904bf8002c498d
+  Building wheel for tokenizers (pyproject.toml): finished with status 'error'
+  ERROR: Failed building wheel for tokenizers
+Failed to build tokenizers
+error: failed-wheel-build-for-install
+
+× Failed to build installable wheels for some pyproject.toml based projects
+╰─> tokenizers
