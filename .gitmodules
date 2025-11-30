@@ -1,6 +1,0 @@
-[submodule "src/refusal_direction"]
-	path = src/refusal_direction
-	url = https://github.com/andyrdt/refusal_direction.git
-[submodule "src/gcg"]
-	path = src/gcg
-	url = https://github.com/llm-attacks/llm-attacks.git
