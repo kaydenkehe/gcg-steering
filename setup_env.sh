@@ -35,9 +35,9 @@ check_python() {
 install_system_deps() {
     # Install build essentials and OpenSSL headers for tokenizers builds
     if command -v apt-get >/dev/null 2>&1; then
-        echo "Installing system build dependencies (pkg-config, libssl-dev, build-essential, curl)..."
+        echo "Installing system build dependencies (pkg-config, libssl-dev, build-essential, curl, rustc, cargo)..."
         apt-get update -y
-        apt-get install -y pkg-config libssl-dev build-essential curl
+        apt-get install -y pkg-config libssl-dev build-essential curl rustc cargo
     else
         echo "WARNING: apt-get not found; please install pkg-config, libssl-dev, build-essential, and curl manually."
     fi
@@ -61,18 +61,8 @@ ensure_rust() {
         echo "Rust compiler already installed: $(rustc --version)"
         return 0
     fi
-
-    echo "Rust compiler not found. Installing via rustup (non-interactive)..."
-    if ! command -v curl &> /dev/null; then
-        echo "curl is required to install rustup automatically. Please install curl or install Rust manually from https://rustup.rs"
-        return 1
-    fi
-
-    curl https://sh.rustup.rs -sSf | sh -s -- -y
-
-    # shellcheck disable=SC1090
-    source "$HOME/.cargo/env"
-    echo "Installed Rust: $(rustc --version)"
+    echo "Rust compiler not found and could not be installed via package manager; please install Rust manually (https://rustup.rs) and re-run."
+    return 1
 }
 
 install_python_deps() {
