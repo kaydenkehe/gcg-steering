@@ -131,6 +131,11 @@ def substring_matching_judge_fn(completion: str, refusal_substrings: List[str]=_
     return any([refusal_substring.lower() in completion.lower() for refusal_substring in refusal_substrings])
 
 def llamaguard2_judge_fn(prompts: List[str], responses: List[str]) -> List[int]:
+    try:
+        import litellm  # noqa: F401
+    except ImportError as e:
+        raise RuntimeError("litellm is required for LlamaGuard2 evaluation. Install litellm to use this metric.") from e
+
     assert os.environ.get("TOGETHER_API_KEY", None) is not None, "TOGETHER_API_KEY environment variable must be set to run jailbreakbench evaluation."
 
     classifier = LlamaGuard2Classifier(os.environ["TOGETHER_API_KEY"])

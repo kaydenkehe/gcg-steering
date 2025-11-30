@@ -65,7 +65,7 @@ def parse_args():
     p.add_argument("--allow-non-ascii", action="store_true", default=False)
     p.add_argument("--run-gcg-baseline", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--run-ablation-baseline", action=argparse.BooleanOptionalAction, default=True)
-    p.add_argument("--disable-llamaguard", action=argparse.BooleanOptionalAction, default=False)
+    p.add_argument("--disable-llamaguard", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--device", default="cuda:0")
     p.add_argument("--seed", type=int, default=42)
     return p.parse_args()

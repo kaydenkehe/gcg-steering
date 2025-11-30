@@ -11,7 +11,6 @@ pandas>=2.0
 tqdm>=4.66
 
 datasets>=2.19.0           # for evaluate_loss (Pile/Alpaca) in refusal_direction
-litellm>=1.40.0            # for LlamaGuard2 calls
 
 einops>=0.8.0
 jaxtyping>=0.2.29
@@ -19,6 +18,7 @@ matplotlib>=3.9.0
 
 sentencepiece>=0.1.99
 safetensors>=0.4.0
+pydantic<2.0               # fschat requires <=2.0
 
 openai>=1.30.0             # used in api_experiments
 anthropic>=0.34.0          # used in api_experiments
