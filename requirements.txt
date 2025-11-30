@@ -1,25 +1,29 @@
-torch>=2.1.0
+# Minimal, compatible pins for gcg-steering (FastChat + Transformers 4.28.x + Python 3.11)
+
+# Core model stack
+torch==2.1.0
 transformers==4.28.1
-accelerate>=0.31.0
+tokenizers==0.13.3
+accelerate==0.21.0
+fschat==0.2.20           # FastChat conversation templates
+pydantic<2.0              # required by fschat 0.2.20
 
-fschat==0.2.20             # FastChat for conversation templates
-ml_collections>=0.1.1      # config handling in GCG experiments
-absl-py>=1.4.0             # absl.app used in GCG scripts
+# GCG / infra
+ml_collections==0.1.1
+absl-py==1.4.0
 
-numpy>=1.24
-pandas>=2.0
-tqdm>=4.66
+# Data / utils
+numpy==1.26.4
+pandas==2.0.3
+tqdm==4.66.4
+datasets==2.19.0
+einops==0.8.0
+jaxtyping==0.2.29
+matplotlib==3.8.4
+sentencepiece==0.1.99
+safetensors==0.4.2
 
-datasets>=2.19.0           # for evaluate_loss (Pile/Alpaca) in refusal_direction
-
-einops>=0.8.0
-jaxtyping>=0.2.29
-matplotlib>=3.9.0
-
-sentencepiece>=0.1.99
-safetensors>=0.4.0
-pydantic<2.0               # fschat requires <=2.0
-
-openai>=1.30.0             # used in api_experiments
-anthropic>=0.34.0          # used in api_experiments
-scriptify==0.0.1           # used in api_experiments (only version available)
+# API experiments (optional but kept)
+openai==1.30.0
+anthropic==0.34.0
+scriptify==0.0.1
