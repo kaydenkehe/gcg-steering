@@ -111,6 +111,12 @@ def compute_loss_over_dataset(model, tokenizer, batch_iterator, n_batches=256, f
 
         # apply loss_mask
         log_probs_for_labels = log_probs_for_labels * loss_mask.to(log_probs_for_labels.device)
+        # guard against numerical issues (e.g., NaNs/Infs from extreme logits)
+        log_probs_for_labels = torch.where(
+            torch.isfinite(log_probs_for_labels),
+            log_probs_for_labels,
+            torch.zeros_like(log_probs_for_labels),
+        )
 
         accumulated_loss += -log_probs_for_labels.sum()
         accumulated_n_tokens += loss_mask.sum()

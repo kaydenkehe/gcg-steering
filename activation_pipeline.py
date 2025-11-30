@@ -69,6 +69,7 @@ def parse_args():
     p.add_argument("--device", default="cuda:0")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--harmless-limit", type=int, default=100, help="Max harmless/harmful prompts to evaluate (use 0 for all)")
+    p.add_argument("--evaluate-only", action="store_true", help="Skip attacks/generation and re-evaluate existing completions")
     return p.parse_args()
 
 
@@ -226,42 +227,61 @@ def main():
     direction, layer, pos = load_direction(args.direction_path, args.direction_meta)
     print(f"Loaded direction: layer={layer}, pos={pos}, norm={direction.norm().item():.4f}")
 
-    # Attack runs
-    activation_suffix = run_activation_gcg(args, direction, layer, pos)
-    print("Activation-GCG suffix:", activation_suffix)
-
-    gcg_suffix = None
-    if args.run_gcg_baseline:
-        gcg_suffix = run_standard_gcg(args)
-        print("Standard GCG suffix:", gcg_suffix)
-
     # Prepare model for evaluation (reuse refusal-direction utilities)
     model_base = Llama2Model(args.model_path)
     harmful_eval, harmless_eval = load_eval_sets(args.harmless_limit)
 
     variants = []
-    variants.append(("activation_gcg", activation_suffix, [], []))
-    if gcg_suffix:
-        variants.append(("gcg", gcg_suffix, [], []))
 
-    if args.run_ablation_baseline:
-        ablation_pre, ablation_hooks = get_all_direction_ablation_hooks(model_base, direction)
-        variants.append(("ablation", None, ablation_pre, ablation_hooks))
+    if args.evaluate_only:
+        print("=== Evaluate-only mode: skipping attacks and generation ===")
+        # Use existing completions from disk
+        variants = [("activation_gcg", None, [], [])]
+        if args.run_gcg_baseline:
+            variants.append(("gcg", None, [], []))
+        if args.run_ablation_baseline:
+            ablation_pre, ablation_hooks = get_all_direction_ablation_hooks(model_base, direction)
+            variants.append(("ablation", None, ablation_pre, ablation_hooks))
+    else:
+        # Attack runs
+        activation_suffix = run_activation_gcg(args, direction, layer, pos)
+        print("Activation-GCG suffix:", activation_suffix)
 
-    # Generate completions and evaluate
+        gcg_suffix = None
+        if args.run_gcg_baseline:
+            gcg_suffix = run_standard_gcg(args)
+            print("Standard GCG suffix:", gcg_suffix)
+
+        variants.append(("activation_gcg", activation_suffix, [], []))
+        if gcg_suffix:
+            variants.append(("gcg", gcg_suffix, [], []))
+
+        if args.run_ablation_baseline:
+            ablation_pre, ablation_hooks = get_all_direction_ablation_hooks(model_base, direction)
+            variants.append(("ablation", None, ablation_pre, ablation_hooks))
+
+    # Generate completions (if needed) and evaluate
     for name, suffix, pre_hooks, hooks in variants:
-        print(f"=== Generating completions for {name} ===")
-        harm_comp = generate_completions(
-            model_base, harmful_eval, suffix=suffix, fwd_pre_hooks=pre_hooks, fwd_hooks=hooks, max_new_tokens=128
-        )
-        harmless_comp = generate_completions(
-            model_base, harmless_eval, suffix=suffix, fwd_pre_hooks=pre_hooks, fwd_hooks=hooks, max_new_tokens=128
-        )
-
         harm_path = os.path.join(args.output_dir, "completions", f"{name}_harmful.json")
         harmless_path = os.path.join(args.output_dir, "completions", f"{name}_harmless.json")
-        json.dump(harm_comp, open(harm_path, "w"), indent=4)
-        json.dump(harmless_comp, open(harmless_path, "w"), indent=4)
+
+        if not args.evaluate_only:
+            print(f"=== Generating completions for {name} ===")
+            harm_comp = generate_completions(
+                model_base, harmful_eval, suffix=suffix, fwd_pre_hooks=pre_hooks, fwd_hooks=hooks, max_new_tokens=128
+            )
+            harmless_comp = generate_completions(
+                model_base, harmless_eval, suffix=suffix, fwd_pre_hooks=pre_hooks, fwd_hooks=hooks, max_new_tokens=128
+            )
+
+            json.dump(harm_comp, open(harm_path, "w"), indent=4)
+            json.dump(harmless_comp, open(harmless_path, "w"), indent=4)
+        else:
+            print(f"=== Evaluate-only: loading completions for {name} from disk ===")
+            with open(harm_path) as f:
+                harm_comp = json.load(f)
+            with open(harmless_path) as f:
+                harmless_comp = json.load(f)
 
         # Jailbreak evals (substring + optional LlamaGuard2)
         meths = ["substring_matching"]
