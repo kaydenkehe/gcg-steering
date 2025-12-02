@@ -298,15 +298,17 @@ def main():
 
     if args.evaluate_only:
         print("=== Evaluate-only mode: skipping attacks and generation ===")
-        # Use existing completions from disk
-        variants = [("activation_gcg", None, [], [])]
+        # Use existing completions from disk; include a no-suffix baseline if present.
+        variants = [("baseline", None, [], []), ("activation_gcg", None, [], [])]
         if args.run_gcg_baseline:
             variants.append(("gcg", None, [], []))
         if args.run_ablation_baseline:
             ablation_pre, ablation_hooks = get_all_direction_ablation_hooks(model_base, direction)
             variants.append(("ablation", None, ablation_pre, ablation_hooks))
     else:
-        # Attack runs: run standard GCG first, then activation-GCG
+        # Attack runs: first generate a no-suffix baseline, then run standard GCG, then activation-GCG.
+        variants.append(("baseline", None, [], []))
+
         gcg_suffix = None
         if args.run_gcg_baseline:
             gcg_suffix = run_standard_gcg(args, conversation_template)
@@ -341,6 +343,9 @@ def main():
             json.dump(harmless_comp, open(harmless_path, "w"), indent=4)
         else:
             print(f"=== Evaluate-only: loading completions for {name} from disk ===")
+            if not (os.path.exists(harm_path) and os.path.exists(harmless_path)):
+                print(f"=== Evaluate-only: skipping {name}, missing completions in {args.output_dir} ===")
+                continue
             with open(harm_path) as f:
                 harm_comp = json.load(f)
             with open(harmless_path) as f:

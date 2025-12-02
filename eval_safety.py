@@ -30,8 +30,8 @@ def parse_args():
     )
     p.add_argument(
         "--variants",
-        default="activation_gcg,gcg,ablation",
-        help="Comma-separated list of variants to evaluate",
+        default="baseline,activation_gcg,gcg,ablation",
+        help="Comma-separated list of variants to evaluate (include 'baseline' for no-suffix completions)",
     )
     p.add_argument(
         "--methods",
@@ -82,4 +82,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
