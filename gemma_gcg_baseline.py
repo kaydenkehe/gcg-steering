@@ -23,17 +23,12 @@ import os
 import random
 from typing import List, Tuple
 
+import numpy as np
 import torch
+import torch.nn as nn
 from tqdm import tqdm
 import pandas as pd
 
-# Reuse minimal GCG utilities (no FastChat dependency)
-from src.gcg.llm_attacks.minimal_gcg.opt_utils import (
-    token_gradients,
-    sample_control,
-    get_logits,
-    target_loss,
-)
 from src.refusal_direction.pipeline.model_utils.gemma_model import GemmaModel
 
 
@@ -80,6 +75,148 @@ def build_input_ids(tokenizer, goal: str, control_ids: List[int], target: str, d
     target_slice = slice(target_start, target_stop)
     loss_slice = slice(target_start - 1, target_stop - 1)
     return input_ids, control_slice, target_slice, loss_slice
+
+
+def _model_device(model) -> torch.device:
+    """Helper to get the device a model is on."""
+    return next(model.parameters()).device
+
+
+def token_gradients(model, input_ids, input_slice, target_slice, loss_slice):
+    """
+    Compute gradients of CE loss w.r.t. control token embeddings (GCG objective).
+    """
+    device = _model_device(model)
+    embed = model.get_input_embeddings()
+    embed_weights = embed.weight
+
+    # One-hot for control tokens
+    one_hot = torch.zeros(
+        input_ids[input_slice].shape[0],
+        embed_weights.shape[0],
+        device=device,
+        dtype=embed_weights.dtype,
+    )
+    one_hot.scatter_(
+        1,
+        input_ids[input_slice].to(device).unsqueeze(1),
+        torch.ones(one_hot.shape[0], 1, device=device, dtype=embed_weights.dtype),
+    )
+    one_hot.requires_grad_()
+    input_embeds = (one_hot @ embed_weights).unsqueeze(0)
+
+    # Stitch together embeddings
+    embeds = embed(input_ids.unsqueeze(0).to(device)).detach()
+    full_embeds = torch.cat(
+        [embeds[:, : input_slice.start, :], input_embeds, embeds[:, input_slice.stop :, :]],
+        dim=1,
+    )
+
+    logits = model(inputs_embeds=full_embeds).logits
+    targets = input_ids[target_slice].to(device)
+    loss = nn.CrossEntropyLoss()(logits[0, loss_slice, :], targets)
+    loss.backward()
+
+    grad = one_hot.grad.clone()
+    grad = grad / grad.norm(dim=-1, keepdim=True)
+    return grad
+
+
+def sample_control(control_toks, grad, batch_size, topk=256, temp=1, not_allowed_tokens=None):
+    """Sample new control tokens using coordinate-wise gradient information."""
+    if not_allowed_tokens is not None:
+        grad[:, not_allowed_tokens.to(grad.device)] = np.inf
+
+    top_indices = (-grad).topk(topk, dim=1).indices
+    control_toks = control_toks.to(grad.device)
+
+    original_control_toks = control_toks.repeat(batch_size, 1)
+    new_token_pos = torch.arange(
+        0,
+        len(control_toks),
+        len(control_toks) / batch_size,
+        device=grad.device,
+    ).type(torch.int64)
+    new_token_val = torch.gather(
+        top_indices[new_token_pos],
+        1,
+        torch.randint(0, topk, (batch_size, 1), device=grad.device),
+    )
+    new_control_toks = original_control_toks.scatter_(1, new_token_pos.unsqueeze(-1), new_token_val)
+    return new_control_toks
+
+
+def _forward_batches(*, model, input_ids, attention_mask, batch_size=512):
+    device = _model_device(model)
+    logits = []
+    for i in range(0, input_ids.shape[0], batch_size):
+        batch_input_ids = input_ids[i : i + batch_size].to(device)
+        if attention_mask is not None:
+            batch_attention_mask = attention_mask[i : i + batch_size].to(device)
+        else:
+            batch_attention_mask = None
+        logits.append(model(input_ids=batch_input_ids, attention_mask=batch_attention_mask).logits)
+        del batch_input_ids, batch_attention_mask
+        torch.cuda.empty_cache() if device.type == "cuda" else None
+    return torch.cat(logits, dim=0)
+
+
+def get_logits(*, model, tokenizer, input_ids, control_slice, test_controls=None, return_ids=False, batch_size=512):
+    """
+    Replace control_slice with each candidate control and get logits.
+    """
+    device = _model_device(model)
+
+    if isinstance(test_controls[0], str):
+        max_len = control_slice.stop - control_slice.start
+        test_ids = [
+            torch.tensor(
+                tokenizer(control, add_special_tokens=False).input_ids[:max_len],
+                device=device,
+            )
+            for control in test_controls
+        ]
+        pad_tok = 0
+        while pad_tok in input_ids or any([pad_tok in ids for ids in test_ids]):
+            pad_tok += 1
+        nested_ids = torch.nested.nested_tensor(test_ids)
+        test_ids = torch.nested.to_padded_tensor(nested_ids, pad_tok, (len(test_ids), max_len))
+    else:
+        raise ValueError(f"test_controls must be a list of strings, got {type(test_controls)}")
+
+    if test_ids[0].shape[0] != control_slice.stop - control_slice.start:
+        raise ValueError(
+            f"test_controls must have shape (n, {control_slice.stop - control_slice.start}), got {test_ids.shape}"
+        )
+
+    locs = torch.arange(control_slice.start, control_slice.stop).repeat(test_ids.shape[0], 1).to(device)
+    ids = torch.scatter(
+        input_ids.unsqueeze(0).repeat(test_ids.shape[0], 1).to(device),
+        1,
+        locs,
+        test_ids,
+    )
+    if pad_tok >= 0:
+        attn_mask = (ids != pad_tok).type(ids.dtype)
+    else:
+        attn_mask = None
+
+    if return_ids:
+        logits = _forward_batches(model=model, input_ids=ids, attention_mask=attn_mask, batch_size=batch_size)
+        del locs, test_ids
+        return logits, ids
+    else:
+        logits = _forward_batches(model=model, input_ids=ids, attention_mask=attn_mask, batch_size=batch_size)
+        del locs, test_ids, ids
+        return logits
+
+
+def target_loss(logits, ids, target_slice):
+    """Per-example CE loss over target_slice tokens."""
+    crit = nn.CrossEntropyLoss(reduction="none")
+    loss_slice = slice(target_slice.start - 1, target_slice.stop - 1)
+    loss = crit(logits[:, loss_slice, :].transpose(1, 2), ids[:, target_slice])
+    return loss.mean(dim=-1)
 
 
 def main():
