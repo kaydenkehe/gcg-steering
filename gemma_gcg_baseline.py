@@ -29,7 +29,16 @@ import torch.nn as nn
 from tqdm import tqdm
 import pandas as pd
 
-from src.refusal_direction.pipeline.model_utils.gemma_model import GemmaModel
+# Ensure refusal_direction's internal `pipeline` package is importable when
+# running from the repo root.
+import sys
+
+REPO_DIR = os.path.dirname(os.path.abspath(__file__))
+REFUSAL_ROOT = os.path.join(REPO_DIR, "src", "refusal_direction")
+if REFUSAL_ROOT not in sys.path:
+    sys.path.append(REFUSAL_ROOT)
+
+from pipeline.model_utils.gemma_model import GemmaModel
 
 
 GEMMA_USER_PREFIX = "<start_of_turn>user\n"
