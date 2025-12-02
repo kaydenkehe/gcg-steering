@@ -68,7 +68,7 @@ def parse_args():
 
 
 def load_direction(direction_path: str, meta_path: str, pos_override=None, layer_override=None):
-    direction = torch.load(direction_path, map_location="cpu")
+    direction = torch.load(direction_path, map_location="cpu").to(torch.float32)
     with open(meta_path) as f:
         meta = json.load(f)
     layer = meta["layer"] if layer_override is None else layer_override
@@ -93,7 +93,7 @@ def make_capture_hook(captured: Dict, layer_idx: int, pos_idx: int):
         seq_len = act.shape[1]
         idx = pos_idx if pos_idx >= 0 else seq_len + pos_idx
         idx = max(min(idx, seq_len - 1), 0)
-        captured["act"] = act[0, idx, :].detach().cpu()
+        captured["act"] = act[0, idx, :].detach().cpu().float()
 
     return hook_fn
 
