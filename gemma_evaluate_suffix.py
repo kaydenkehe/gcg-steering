@@ -34,14 +34,21 @@ GEMMA_CHAT_TEMPLATE = """<start_of_turn>user
 """
 
 
-def load_advbench_prompts(n: int = 5) -> List[str]:
+def load_advbench_prompts(n: int = 5, use_gcg_train_subset: bool = False) -> List[str]:
     """
-    Load the first n harmful Behaviors 'goal' strings from AdvBench.
+    Load harmful Behaviors 'goal' strings from AdvBench.
+
+    If use_gcg_train_subset is True, we replicate the sampling used in
+    gemma_gcg_baseline.py: shuffle with random_state=42 and take the first n
+    from that shuffled order (i.e., a subset of the 25 training prompts).
+    Otherwise, we take the first n rows as before.
     Falls back to hard-coded prompts if the CSV is unavailable.
     """
     path = os.path.join("src", "gcg", "data", "advbench", "harmful_behaviors.csv")
     try:
         df = pd.read_csv(path)
+        if use_gcg_train_subset:
+            df = df.sample(frac=1, random_state=42).reset_index(drop=True)
         goals = df["goal"].tolist()
         return goals[:n]
     except Exception as e:
@@ -96,6 +103,11 @@ def main():
     ap.add_argument("--model-path", required=True)
     ap.add_argument("--suffix", required=True, help="Optimized suffix to append")
     ap.add_argument("--n-prompts", type=int, default=5, help="Number of AdvBench prompts to test")
+    ap.add_argument(
+        "--use-gcg-train-subset",
+        action="store_true",
+        help="If set, draw prompts from the same shuffled AdvBench order used in gemma_gcg_baseline (random_state=42).",
+    )
     ap.add_argument("--max-new-tokens", type=int, default=128)
     args = ap.parse_args()
 
@@ -107,7 +119,7 @@ def main():
     print(f"Suffix: {args.suffix!r}")
     print("=" * 80)
 
-    prompts = load_advbench_prompts(n=args.n_prompts)
+    prompts = load_advbench_prompts(n=args.n_prompts, use_gcg_train_subset=args.use_gcg_train_subset)
 
     for i, base_prompt in enumerate(prompts, 1):
         prompt_plain = build_gemma_prompt(base_prompt)
@@ -127,4 +139,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
