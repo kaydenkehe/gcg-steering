@@ -176,7 +176,11 @@ def get_logits(*, model, tokenizer, input_ids, control_slice, test_controls=None
     """
     device = _model_device(model)
 
-    if isinstance(test_controls[0], str):
+    if isinstance(test_controls, torch.Tensor):
+        # Direct tensor of token IDs: shape [batch, control_len]
+        test_ids = test_controls.to(device)
+        pad_tok = -1
+    elif isinstance(test_controls[0], str):
         max_len = control_slice.stop - control_slice.start
         test_ids = [
             torch.tensor(
