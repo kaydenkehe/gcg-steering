@@ -337,9 +337,11 @@ def main():
             best_loss = best_step_loss
             best_control_ids = best_cand_ids
 
-        # Print progress
+        # Print progress and periodically show current best suffix
         if step % 10 == 0 or step == args.n_steps - 1:
             print(f"Step {step+1}/{args.n_steps} | loss {best_step_loss:.4f}")
+            current_best = tokenizer.decode(best_control_ids, skip_special_tokens=True)
+            print(f"Current best suffix (step {step+1}): {current_best}")
 
     # Save final suffix
     final_suffix = tokenizer.decode(best_control_ids, skip_special_tokens=True)
