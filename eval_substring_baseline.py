@@ -20,6 +20,8 @@ import os
 import sys
 
 import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
+from fastchat.model import get_conversation_template
 
 
 def parse_args():
@@ -57,7 +59,6 @@ def main():
         sys.path.append(rd_path)
 
     from dataset.load_dataset import load_dataset_split  # type: ignore
-    from pipeline.model_utils.llama2_model import Llama2Model  # type: ignore
     from pipeline.submodules.evaluate_jailbreak import evaluate_jailbreak  # type: ignore
 
     torch.set_grad_enabled(False)
@@ -75,13 +76,54 @@ def main():
 
     print(f"Using {len(harmful_eval)} harmful and {len(harmless_eval)} harmless prompts.")
 
-    # Load model (no suffix, no ablation)
-    model_base = Llama2Model(args.model_path)
+    # Load plain HF model/tokenizer (no ModelBase, so no jaxtyping)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    tok = AutoTokenizer.from_pretrained(args.model_path, use_fast=False)
+    if tok.pad_token is None:
+        tok.pad_token = tok.eos_token
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_path,
+        torch_dtype=torch.float16,
+        device_map="auto" if torch.cuda.is_available() else None,
+    )
+    model.to(device)
+    model.eval()
+
+    def build_prompt(user_content: str) -> str:
+        from fastchat.model import get_conversation_template
+
+        conv = get_conversation_template("llama-2")
+        conv.append_message(conv.roles[0], user_content)
+        conv.append_message(conv.roles[1], None)
+        return conv.get_prompt()
+
+    def generate_batch(dataset):
+        completions = []
+        gen_cfg = GenerationConfig(
+            max_new_tokens=128,
+            do_sample=False,
+            pad_token_id=tok.pad_token_id,
+        )
+        for row in dataset:
+            prompt = build_prompt(row["instruction"])
+            inputs = tok(prompt, return_tensors="pt").to(model.device)
+            with torch.no_grad():
+                output_ids = model.generate(**inputs, generation_config=gen_cfg)
+            gen = output_ids[0, inputs.input_ids.shape[1] :]
+            resp = tok.decode(gen, skip_special_tokens=True).strip()
+            completions.append(
+                {
+                    "category": row.get("category", "unknown"),
+                    "prompt": row["instruction"],
+                    "response": resp,
+                }
+            )
+        return completions
 
     # Generate baseline completions
     print("=== Generating baseline completions (no suffix) ===")
-    harm_comp = model_base.generate_completions(harmful_eval, batch_size=8, max_new_tokens=128)
-    harmless_comp = model_base.generate_completions(harmless_eval, batch_size=8, max_new_tokens=128)
+    harm_comp = generate_batch(harmful_eval)
+    harmless_comp = generate_batch(harmless_eval)
 
     harm_path = os.path.join(completions_dir, "baseline_harmful.json")
     harmless_path = os.path.join(completions_dir, "baseline_harmless.json")
@@ -114,4 +156,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
