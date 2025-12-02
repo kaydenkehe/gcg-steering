@@ -35,6 +35,7 @@ from llm_attacks.gcg import MultiPromptAttack as GcgMultiPromptAttack
 
 from dataset.load_dataset import load_dataset_split
 from pipeline.model_utils.llama2_model import Llama2Model
+from pipeline.model_utils.gemma_model import GemmaModel
 from pipeline.utils.hook_utils import (
     get_all_direction_ablation_hooks,
     get_direction_ablation_input_pre_hook,
@@ -68,6 +69,11 @@ def parse_args():
     p.add_argument("--disable-llamaguard", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--device", default="cuda:0")
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument(
+        "--conversation-template",
+        default=None,
+        help="FastChat conversation template name (defaults inferred from model-path: llama-2 or gemma)",
+    )
     p.add_argument("--harmless-limit", type=int, default=100, help="Max harmless/harmful prompts to evaluate (use 0 for all)")
     p.add_argument("--evaluate-only", action="store_true", help="Skip attacks/generation and re-evaluate existing completions")
     return p.parse_args()
@@ -76,6 +82,29 @@ def parse_args():
 def ensure_dir(path):
     os.makedirs(path, exist_ok=True)
     return path
+
+
+DEFAULTS = {
+    "llama2": {
+        "direction_path": "src/refusal_direction/pipeline/runs/llama-2-7b-chat-hf/direction.pt",
+        "direction_meta": "src/refusal_direction/pipeline/runs/llama-2-7b-chat-hf/direction_metadata.json",
+        "conversation_template": "llama-2",
+        "model_cls": Llama2Model,
+    },
+    "gemma": {
+        "direction_path": "src/refusal_direction/pipeline/runs/gemma-2b-it/direction.pt",
+        "direction_meta": "src/refusal_direction/pipeline/runs/gemma-2b-it/direction_metadata.json",
+        "conversation_template": "gemma-instruct",
+        "model_cls": GemmaModel,
+    },
+}
+
+
+def infer_model_family(model_path: str) -> str:
+    path = model_path.lower()
+    if "gemma" in path:
+        return "gemma"
+    return "llama2"
 
 
 def load_direction(direction_path, direction_meta):
@@ -91,14 +120,14 @@ def load_direction(direction_path, direction_meta):
     return direction, layer, pos
 
 
-def build_params(model_path, device):
+def build_params(model_path, device, conversation_template):
     # Minimal params object for get_workers
     params = SimpleNamespace()
     params.tokenizer_paths = [model_path]
     params.tokenizer_kwargs = [{"use_fast": False}]
     params.model_paths = [model_path]
     params.model_kwargs = [{"low_cpu_mem_usage": True, "use_cache": False}]
-    params.conversation_templates = ["llama-2"]
+    params.conversation_templates = [conversation_template]
     params.devices = [device]
     params.num_train_models = 1
     return params
@@ -127,9 +156,9 @@ def sample_advbench_pairs(n_train):
     return goals, targets
 
 
-def run_activation_gcg(args, direction, layer, pos):
+def run_activation_gcg(args, direction, layer, pos, conversation_template):
     print("=== Running activation-based GCG ===")
-    params = build_params(args.model_path, args.device)
+    params = build_params(args.model_path, args.device, conversation_template)
     workers, test_workers = get_workers(params)
 
     goals = sample_harmful_prompts(args.n_train)
@@ -168,9 +197,9 @@ def run_activation_gcg(args, direction, layer, pos):
     return suffix
 
 
-def run_standard_gcg(args):
+def run_standard_gcg(args, conversation_template):
     print("=== Running standard GCG baseline ===")
-    params = build_params(args.model_path, args.device)
+    params = build_params(args.model_path, args.device, conversation_template)
     workers, test_workers = get_workers(params)
     goals, targets = sample_advbench_pairs(args.n_train)
     if goals is None or targets is None:
@@ -244,11 +273,25 @@ def main():
     ensure_dir(args.output_dir)
     ensure_dir(os.path.join(args.output_dir, "completions"))
 
+    model_family = infer_model_family(args.model_path)
+    defaults = DEFAULTS[model_family]
+
+    # Auto-switch direction paths if user left defaults pointing to Llama-2 but selected Gemma
+    if model_family == "gemma":
+        if args.direction_path == DEFAULTS["llama2"]["direction_path"]:
+            print("Auto-selecting Gemma direction artifacts.")
+            args.direction_path = defaults["direction_path"]
+        if args.direction_meta == DEFAULTS["llama2"]["direction_meta"]:
+            args.direction_meta = defaults["direction_meta"]
+
+    conversation_template = args.conversation_template or defaults["conversation_template"]
+
     direction, layer, pos = load_direction(args.direction_path, args.direction_meta)
     print(f"Loaded direction: layer={layer}, pos={pos}, norm={direction.norm().item():.4f}")
 
     # Prepare model for evaluation (reuse refusal-direction utilities)
-    model_base = Llama2Model(args.model_path)
+    model_base_cls = defaults["model_cls"]
+    model_base = model_base_cls(args.model_path)
     harmful_eval, harmless_eval = load_eval_sets(args.harmless_limit)
 
     variants = []
@@ -266,10 +309,10 @@ def main():
         # Attack runs: run standard GCG first, then activation-GCG
         gcg_suffix = None
         if args.run_gcg_baseline:
-            gcg_suffix = run_standard_gcg(args)
+            gcg_suffix = run_standard_gcg(args, conversation_template)
             print("Standard GCG suffix:", gcg_suffix)
 
-        activation_suffix = run_activation_gcg(args, direction, layer, pos)
+        activation_suffix = run_activation_gcg(args, direction, layer, pos, conversation_template)
         print("Activation-GCG suffix:", activation_suffix)
 
         variants.append(("activation_gcg", activation_suffix, [], []))
