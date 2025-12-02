@@ -263,14 +263,14 @@ def main():
             ablation_pre, ablation_hooks = get_all_direction_ablation_hooks(model_base, direction)
             variants.append(("ablation", None, ablation_pre, ablation_hooks))
     else:
-    # Attack runs: run standard GCG first, then activation-GCG
-    gcg_suffix = None
-    if args.run_gcg_baseline:
-        gcg_suffix = run_standard_gcg(args)
-        print("Standard GCG suffix:", gcg_suffix)
+        # Attack runs: run standard GCG first, then activation-GCG
+        gcg_suffix = None
+        if args.run_gcg_baseline:
+            gcg_suffix = run_standard_gcg(args)
+            print("Standard GCG suffix:", gcg_suffix)
 
-    activation_suffix = run_activation_gcg(args, direction, layer, pos)
-    print("Activation-GCG suffix:", activation_suffix)
+        activation_suffix = run_activation_gcg(args, direction, layer, pos)
+        print("Activation-GCG suffix:", activation_suffix)
 
         variants.append(("activation_gcg", activation_suffix, [], []))
         if gcg_suffix:
