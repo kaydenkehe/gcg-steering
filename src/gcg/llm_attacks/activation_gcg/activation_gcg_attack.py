@@ -6,7 +6,7 @@ from llm_attacks import AttackPrompt, PromptManager, MultiPromptAttack
 from llm_attacks import get_embedding_matrix, get_embeddings, get_nonascii_toks
 
 
-def token_gradients_activation(model, input_ids, input_slice, pos, layer, direction):
+def token_gradients_activation(model, input_ids, input_slice, pos, layer, direction, act_obj="negative"):
     """
     Compute gradients of the activation projection onto `direction` w.r.t. control tokens.
 
@@ -55,8 +55,10 @@ def token_gradients_activation(model, input_ids, input_slice, pos, layer, direct
 
     direction = direction.to(hidden)
     proj = torch.dot(hidden[idx], direction)
-    # Minimize projection magnitude (alignment with ablation: push projection toward zero)
-    obj = proj ** 2
+    if act_obj == "zero":
+        obj = proj ** 2  # ablation-aligned: projection -> 0
+    else:
+        obj = proj  # push negative
     obj.backward()
 
     grad = one_hot.grad.clone()
@@ -66,12 +68,14 @@ def token_gradients_activation(model, input_ids, input_slice, pos, layer, direct
 
 
 class ActivationAttackPrompt(AttackPrompt):
-    def __init__(self, *args, direction=None, layer=None, pos=-1, **kwargs):
+    def __init__(self, *args, direction=None, layer=None, pos=-1, act_obj="negative", **kwargs):
         super().__init__(*args, **kwargs)
         assert direction is not None and layer is not None
         self.direction = direction
         self.layer = layer
         self.pos = pos
+        # act_obj: "negative" -> push projection negative; "zero" -> minimize magnitude
+        self.act_obj = act_obj
 
     def grad_activation(self, model):
         return token_gradients_activation(
@@ -81,6 +85,7 @@ class ActivationAttackPrompt(AttackPrompt):
             self.pos,
             self.layer,
             self.direction,
+            self.act_obj,
         )
 
     def activation_score(self, model, direction=None, layer=None, pos=None, test_controls=None):
@@ -91,6 +96,7 @@ class ActivationAttackPrompt(AttackPrompt):
         direction = direction if direction is not None else self.direction
         layer = layer if layer is not None else self.layer
         pos = self.pos if pos is None else pos
+        act_obj = getattr(self, "act_obj", "negative")
 
         pad_tok = -1
         if test_controls is None:
@@ -150,10 +156,12 @@ class ActivationAttackPrompt(AttackPrompt):
         idxs = torch.tensor(idxs, device=activations.device)
 
         direction = direction.to(activations)
-        # Return squared projection magnitudes so loss encourages projection -> 0
-        scores = torch.stack(
-            [(torch.dot(activations[b, idxs[b], :], direction) ** 2) for b in range(activations.shape[0])]
-        )
+        # Return per-example scores according to objective
+        proj = torch.stack([torch.dot(activations[b, idxs[b], :], direction) for b in range(activations.shape[0])])
+        if act_obj == "zero":
+            scores = proj ** 2  # ablation-aligned: projection -> 0
+        else:
+            scores = proj  # negative objective: push projection as negative as possible
 
         del ids, locs, test_ids, activations, captured
         gc.collect()
@@ -161,11 +169,12 @@ class ActivationAttackPrompt(AttackPrompt):
 
 
 class ActivationPromptManager(PromptManager):
-    def __init__(self, *args, direction=None, layer=None, pos=-1, managers=None, **kwargs):
+    def __init__(self, *args, direction=None, layer=None, pos=-1, act_obj="negative", managers=None, **kwargs):
         assert direction is not None and layer is not None
         self.direction = direction
         self.layer = layer
         self.pos = pos
+        self.act_obj = act_obj
 
         goals, targets, tokenizer, conv_template, control_init, test_prefixes = args[:6]
 
@@ -181,6 +190,7 @@ class ActivationPromptManager(PromptManager):
                 direction=direction,
                 layer=layer,
                 pos=pos,
+                act_obj=act_obj,
             )
             for goal, target in zip(goals, targets)
         ]

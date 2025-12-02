@@ -105,10 +105,26 @@ def build_params(model_path, device):
 
 
 def sample_harmful_prompts(n_train):
+    """Default harmful prompt sampling (used by activation-GCG): refusal_direction split."""
     harmful = load_dataset_split(harmtype="harmful", split="train", instructions_only=True)
     random.seed(42)
     random.shuffle(harmful)
     return harmful[:n_train]
+
+
+def sample_advbench_pairs(n_train):
+    """
+    Sample paired (goal, target) from AdvBench harmful_behaviors.csv to mirror src/gcg defaults.
+    """
+    import pandas as pd
+    adv_path = os.path.join("src", "gcg", "data", "advbench", "harmful_behaviors.csv")
+    if not os.path.exists(adv_path):
+        return None, None
+    df = pd.read_csv(adv_path)
+    df = df.sample(frac=1, random_state=42).reset_index(drop=True)
+    goals = df["goal"].tolist()[:n_train]
+    targets = df["target"].tolist()[:n_train]
+    return goals, targets
 
 
 def run_activation_gcg(args, direction, layer, pos):
@@ -130,6 +146,7 @@ def run_activation_gcg(args, direction, layer, pos):
         pos=pos,
         control_init="! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! !",
         managers=managers,
+        act_obj="negative",  # default: drive projection negative (compliance direction)
     )
     suffix, loss = attack.run(
         n_steps=args.n_steps,
@@ -155,8 +172,11 @@ def run_standard_gcg(args):
     print("=== Running standard GCG baseline ===")
     params = build_params(args.model_path, args.device)
     workers, test_workers = get_workers(params)
-    goals = sample_harmful_prompts(args.n_train)
-    targets = ["Sure, here is"] * len(goals)
+    goals, targets = sample_advbench_pairs(args.n_train)
+    if goals is None or targets is None:
+        # Fallback: use refusal_direction harmful prompts and build targets with instruction
+        goals = sample_harmful_prompts(args.n_train)
+        targets = [f"Sure, here is how to {g}" if g else "Sure, here is how to" for g in goals]
     managers = {"AP": GcgAttackPrompt, "PM": GcgPromptManager, "MPA": GcgMultiPromptAttack}
     attack = GcgMultiPromptAttack(
         goals,
@@ -243,14 +263,14 @@ def main():
             ablation_pre, ablation_hooks = get_all_direction_ablation_hooks(model_base, direction)
             variants.append(("ablation", None, ablation_pre, ablation_hooks))
     else:
-        # Attack runs
-        activation_suffix = run_activation_gcg(args, direction, layer, pos)
-        print("Activation-GCG suffix:", activation_suffix)
+    # Attack runs: run standard GCG first, then activation-GCG
+    gcg_suffix = None
+    if args.run_gcg_baseline:
+        gcg_suffix = run_standard_gcg(args)
+        print("Standard GCG suffix:", gcg_suffix)
 
-        gcg_suffix = None
-        if args.run_gcg_baseline:
-            gcg_suffix = run_standard_gcg(args)
-            print("Standard GCG suffix:", gcg_suffix)
+    activation_suffix = run_activation_gcg(args, direction, layer, pos)
+    print("Activation-GCG suffix:", activation_suffix)
 
         variants.append(("activation_gcg", activation_suffix, [], []))
         if gcg_suffix:
