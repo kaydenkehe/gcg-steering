@@ -208,7 +208,8 @@ def evaluate_jailbreak(
     """
 
     if completions_path is not None:
-        completions = json.load(open(completions_path), 'r')
+        with open(completions_path, 'r') as f:
+            completions = json.load(f)
         assert isinstance(completions, list), "completions_path must point to a list of completions."
     else:
         assert completions is not None, "Either completions_path or completions must be provided."
