@@ -88,6 +88,14 @@ def parse_args():
              "'zero' minimizes at a single (layer,pos); 'negative' pushes projection negative at (layer,pos).",
     )
     p.add_argument(
+        "--activation-score-mode",
+        choices=["global", "local"],
+        default="global",
+        help="Scoring mode for activation-GCG candidate selection. "
+             "'global' (default) scores candidates using the same all-layer/token objective; "
+             "'local' uses only the canonical (layer,pos) projection.",
+    )
+    p.add_argument(
         "--conversation-template",
         default=None,
         help="FastChat conversation template name (defaults inferred from model-path: llama-2 or gemma)",
@@ -192,6 +200,7 @@ def run_activation_gcg(args, direction, layer, pos, conversation_template):
         layer=layer,
         pos=pos,
         act_obj=args.activation_obj,
+        score_mode=args.activation_score_mode,
         control_init="! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! !",
         managers=managers,
     )

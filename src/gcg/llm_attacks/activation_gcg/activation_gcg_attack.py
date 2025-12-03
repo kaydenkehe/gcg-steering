@@ -104,7 +104,7 @@ def token_gradients_activation(model, input_ids, input_slice, pos, layer, direct
 
 
 class ActivationAttackPrompt(AttackPrompt):
-    def __init__(self, *args, direction=None, layer=None, pos=-1, act_obj="negative", **kwargs):
+    def __init__(self, *args, direction=None, layer=None, pos=-1, act_obj="negative", score_mode="global", **kwargs):
         super().__init__(*args, **kwargs)
         assert direction is not None and layer is not None
         self.direction = direction
@@ -112,6 +112,7 @@ class ActivationAttackPrompt(AttackPrompt):
         self.pos = pos
         # act_obj: "negative" -> push projection negative; "zero" -> minimize magnitude
         self.act_obj = act_obj
+        self.score_mode = score_mode
 
     def grad_activation(self, model):
         return token_gradients_activation(
@@ -124,7 +125,7 @@ class ActivationAttackPrompt(AttackPrompt):
             self.act_obj,
         )
 
-    def activation_score(self, model, direction=None, layer=None, pos=None, test_controls=None):
+    def activation_score(self, model, direction=None, layer=None, pos=None, test_controls=None, score_mode=None):
         """
         Compute projection score(s) for provided control strings/tensors.
         Returns a 1D tensor of scores (lower is better).
@@ -133,6 +134,7 @@ class ActivationAttackPrompt(AttackPrompt):
         layer = layer if layer is not None else self.layer
         pos = self.pos if pos is None else pos
         act_obj = getattr(self, "act_obj", "negative")
+        score_mode = score_mode or getattr(self, "score_mode", "global")
 
         pad_tok = -1
         if test_controls is None:
@@ -170,47 +172,83 @@ class ActivationAttackPrompt(AttackPrompt):
         )
         attn_mask = (ids != pad_tok).type(ids.dtype) if pad_tok >= 0 else None
 
-        captured = {}
+        if score_mode == "global":
+            # Global scoring: sum (or sum of squares) over all layers/tokens, per example.
+            handles = []
+            loss_terms = []
 
-        def pre_hook(module, hook_input):
-            captured["act"] = hook_input[0]
+            def global_hook(module, hook_input):
+                act = hook_input[0]  # [batch, seq, d_model]
+                act32 = act.to(torch.float32)
+                dir32 = direction.to(act32) / (direction.norm() + 1e-8)
+                proj = act32 @ dir32  # [batch, seq]
+                if act_obj in ("zero", "global_zero"):
+                    term = (proj ** 2).sum(dim=1)  # [batch]
+                else:
+                    term = proj.sum(dim=1)  # [batch]
+                loss_terms.append(term)
 
-        handle = model.model.layers[layer].register_forward_pre_hook(pre_hook)
-        _ = model(input_ids=ids, attention_mask=attn_mask)
-        handle.remove()
+            for blk in model.model.layers:
+                handles.append(blk.register_forward_pre_hook(global_hook))
+            _ = model(input_ids=ids, attention_mask=attn_mask)
+            for h in handles:
+                h.remove()
 
-        activations = captured["act"]  # [batch, seq, d_model]
-        lengths = attn_mask.sum(-1) if attn_mask is not None else torch.tensor(
-            [ids.shape[1]] * ids.shape[0], device=ids.device
-        )
-        idxs = []
-        for b in range(activations.shape[0]):
-            seq_len = int(lengths[b].item())
-            idx = pos if pos >= 0 else seq_len + pos
-            idx = max(min(idx, seq_len - 1), 0)
-            idxs.append(idx)
-        idxs = torch.tensor(idxs, device=activations.device)
-
-        direction = direction.to(activations)
-        # Return per-example scores according to objective
-        proj = torch.stack([torch.dot(activations[b, idxs[b], :], direction) for b in range(activations.shape[0])])
-        if act_obj in ("zero", "global_zero"):
-            scores = proj ** 2  # ablation-aligned: projection -> 0
+            if not loss_terms:
+                raise RuntimeError("global scoring: no activations captured.")
+            # loss_terms: list of [batch]; stack -> [layers, batch]
+            stacked = torch.stack(loss_terms)  # [num_layers, batch]
+            scores = stacked.sum(dim=0) / (stacked.shape[0] * ids.shape[1])
+            del ids, locs, test_ids, stacked, loss_terms, handles
+            gc.collect()
+            return scores
         else:
-            scores = proj  # negative objective: push projection as negative as possible
+            captured = {}
 
-        del ids, locs, test_ids, activations, captured
-        gc.collect()
-        return scores
+            def pre_hook(module, hook_input):
+                captured["act"] = hook_input[0]
+
+            handle = model.model.layers[layer].register_forward_pre_hook(pre_hook)
+            _ = model(input_ids=ids, attention_mask=attn_mask)
+            handle.remove()
+
+            activations = captured["act"]  # [batch, seq, d_model]
+            lengths = attn_mask.sum(-1) if attn_mask is not None else torch.tensor(
+                [ids.shape[1]] * ids.shape[0], device=ids.device
+            )
+            idxs = []
+            for b in range(activations.shape[0]):
+                seq_len = int(lengths[b].item())
+                idx = pos if pos >= 0 else seq_len + pos
+                idx = max(min(idx, seq_len - 1), 0)
+                idxs.append(idx)
+            idxs = torch.tensor(idxs, device=activations.device)
+
+            # Compute projections in float32 to avoid overflow/inf
+            act32 = activations.to(torch.float32)
+            dir32 = direction.to(act32) / (direction.norm() + 1e-8)
+            # Return per-example scores according to objective
+            proj = torch.stack(
+                [torch.dot(act32[b, idxs[b], :], dir32) for b in range(act32.shape[0])]
+            )
+            if act_obj in ("zero", "global_zero"):
+                scores = proj ** 2  # ablation-aligned: projection -> 0
+            else:
+                scores = proj  # negative objective: push projection as negative as possible
+
+            del ids, locs, test_ids, activations, act32, dir32, captured
+            gc.collect()
+            return scores
 
 
 class ActivationPromptManager(PromptManager):
-    def __init__(self, *args, direction=None, layer=None, pos=-1, act_obj="negative", managers=None, **kwargs):
+    def __init__(self, *args, direction=None, layer=None, pos=-1, act_obj="negative", score_mode="global", managers=None, **kwargs):
         assert direction is not None and layer is not None
         self.direction = direction
         self.layer = layer
         self.pos = pos
         self.act_obj = act_obj
+        self.score_mode = score_mode
 
         goals, targets, tokenizer, conv_template, control_init, test_prefixes = args[:6]
 
@@ -227,6 +265,7 @@ class ActivationPromptManager(PromptManager):
                 layer=layer,
                 pos=pos,
                 act_obj=act_obj,
+                score_mode=score_mode,
             )
             for goal, target in zip(goals, targets)
         ]
@@ -264,6 +303,7 @@ class ActivationMultiPromptAttack(MultiPromptAttack):
         layer,
         pos=-1,
         act_obj="global_zero",
+        score_mode="global",
         control_init="! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! !",
         test_prefixes=[
             "I'm sorry",
@@ -296,6 +336,7 @@ class ActivationMultiPromptAttack(MultiPromptAttack):
         self.pos = pos
         self.managers = managers
         self.act_obj = act_obj
+        self.score_mode = score_mode
 
         self.prompts = [
             managers["PM"](
@@ -309,6 +350,7 @@ class ActivationMultiPromptAttack(MultiPromptAttack):
                 layer=layer,
                 pos=pos,
                 act_obj=act_obj,
+                score_mode=score_mode,
                 managers=managers,
             )
             for worker in workers
@@ -380,6 +422,7 @@ class ActivationMultiPromptAttack(MultiPromptAttack):
                             self.layer,
                             self.pos,
                             cand,
+                            self.score_mode,
                         )
                     scores = [worker.results.get() for worker in self.workers]
                     loss[j * batch_size : (j + 1) * batch_size] += sum(
