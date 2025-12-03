@@ -278,7 +278,7 @@ class ActivationAttackPrompt(AttackPrompt):
                 idxs.append(idx)
             idxs = torch.tensor(idxs, device=ids.device)
 
-            dir32 = direction.to(ids.device)
+            dir32 = direction.to(ids.device, dtype=torch.float32)
             dir32 = dir32 / (dir32.norm() + 1e-8)
             proj_sq_layers = []
             for act in layer_acts:
@@ -307,8 +307,8 @@ class ActivationAttackPrompt(AttackPrompt):
             )
             # Compute projections in float32 to avoid overflow/inf
             act32 = activations.to(torch.float32)
-            dir32 = direction.to(act32)
-            dir32 = dir32 / (dir32.norm() + 1e-8)
+                dir32 = direction.to(act32, dtype=torch.float32)
+                dir32 = dir32 / (dir32.norm() + 1e-8)
             if act_obj == "layer_zero_all":
                 proj = act32 @ dir32  # [batch, seq]
                 if attn_mask is not None:
