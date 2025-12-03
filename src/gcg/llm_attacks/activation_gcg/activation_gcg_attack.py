@@ -89,7 +89,10 @@ def token_gradients_activation(model, input_ids, input_slice, pos, layer, direct
     obj.backward()
 
     grad = one_hot.grad.clone()
-    del embeds, full_embeds, input_embeds, one_hot, hidden, captured
+    if act_obj == "global_zero":
+        del embeds, full_embeds, input_embeds, one_hot
+    else:
+        del embeds, full_embeds, input_embeds, one_hot, hidden, captured
     gc.collect()
     return grad
 
