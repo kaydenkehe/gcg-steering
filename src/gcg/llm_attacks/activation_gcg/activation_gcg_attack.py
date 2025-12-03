@@ -16,6 +16,7 @@ def token_gradients_activation(model, input_ids, input_slice, pos, layer, direct
       - "global_zero": minimize sum of projection magnitudes across *all* layers/tokens
                        (directional ablation style)
       - "layer_zero_all": minimize projection magnitudes for *all tokens* at the specified layer
+      - "token_all_layers": minimize projection magnitudes at the chosen token position, aggregated across *all* layers
     """
     # Clear stale grads
     model.zero_grad(set_to_none=True)
@@ -85,6 +86,32 @@ def token_gradients_activation(model, input_ids, input_slice, pos, layer, direct
         dir32 = direction.to(hidden)
         proj = hidden @ dir32  # [seq]
         obj = (proj ** 2).mean()  # mean across all tokens at this layer
+    elif act_obj == "token_all_layers":
+        # Aggregate proj^2 over all layers at a single token position
+        captured = []
+
+        def layer_hook(module, hook_input):
+            captured.append(hook_input[0])
+
+        handles = [blk.register_forward_pre_hook(layer_hook) for blk in model.model.layers]
+        _ = model(inputs_embeds=full_embeds)
+        for h in handles:
+            h.remove()
+
+        if not captured:
+            raise RuntimeError("token_all_layers objective: no activations captured.")
+
+        seq_len = captured[0].shape[1]
+        idx = pos if pos >= 0 else seq_len + pos
+        idx = max(min(idx, seq_len - 1), 0)
+
+        obj_terms = []
+        for act in captured:
+            hidden = act[0].to(torch.float32)  # [seq, d_model]
+            dir32 = direction.to(hidden)
+            proj = torch.dot(hidden[idx], dir32)
+            obj_terms.append(proj ** 2)
+        obj = torch.stack(obj_terms).mean()
     else:
         captured = {}
 
@@ -115,6 +142,8 @@ def token_gradients_activation(model, input_ids, input_slice, pos, layer, direct
         del embeds, full_embeds, input_embeds, one_hot
     elif act_obj == "layer_zero_all":
         del embeds, full_embeds, input_embeds, one_hot, hidden, captured
+    elif act_obj == "token_all_layers":
+        del embeds, full_embeds, input_embeds, one_hot, captured
     else:
         del embeds, full_embeds, input_embeds, one_hot, hidden, captured
     gc.collect()
@@ -220,6 +249,46 @@ class ActivationAttackPrompt(AttackPrompt):
             del ids, locs, test_ids, stacked, loss_terms, handles
             gc.collect()
             return scores
+        elif score_mode == "token_all_layers":
+            layer_acts = []
+            handles = []
+
+            def hook_all(module, hook_input):
+                layer_acts.append(hook_input[0])
+
+            for blk in model.model.layers:
+                handles.append(blk.register_forward_pre_hook(hook_all))
+
+            _ = model(input_ids=ids, attention_mask=attn_mask)
+            for h in handles:
+                h.remove()
+
+            if not layer_acts:
+                raise RuntimeError("token_all_layers scoring: no activations captured.")
+
+            lengths = attn_mask.sum(-1) if attn_mask is not None else torch.tensor(
+                [ids.shape[1]] * ids.shape[0], device=ids.device
+            )
+            idxs = []
+            for b in range(layer_acts[0].shape[0]):
+                seq_len = int(lengths[b].item())
+                idx = pos if pos >= 0 else seq_len + pos
+                idx = max(min(idx, seq_len - 1), 0)
+                idxs.append(idx)
+            idxs = torch.tensor(idxs, device=ids.device)
+
+            dir32 = direction.to(ids.device) / (direction.norm() + 1e-8)
+            proj_sq_layers = []
+            for act in layer_acts:
+                act32 = act.to(torch.float32)
+                proj = torch.stack(
+                    [torch.dot(act32[b, idxs[b], :], dir32) for b in range(act32.shape[0])]
+                )
+                proj_sq_layers.append(proj ** 2)
+            scores = torch.stack(proj_sq_layers).mean(dim=0)
+            del ids, locs, test_ids, layer_acts, proj_sq_layers, dir32, lengths, idxs, handles
+            gc.collect()
+            return scores
         else:
             captured = {}
 
@@ -275,6 +344,8 @@ class ActivationPromptManager(PromptManager):
         self.layer = layer
         self.pos = pos
         self.act_obj = act_obj
+        if score_mode == "local" and act_obj == "token_all_layers":
+            score_mode = "token_all_layers"
         self.score_mode = score_mode
 
         goals, targets, tokenizer, conv_template, control_init, test_prefixes = args[:6]
@@ -363,6 +434,8 @@ class ActivationMultiPromptAttack(MultiPromptAttack):
         self.pos = pos
         self.managers = managers
         self.act_obj = act_obj
+        if score_mode == "local" and act_obj == "token_all_layers":
+            score_mode = "token_all_layers"
         self.score_mode = score_mode
 
         self.prompts = [

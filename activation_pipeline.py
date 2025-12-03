@@ -81,20 +81,22 @@ def parse_args():
     p.add_argument("--seed", type=int, default=42)
     p.add_argument(
         "--activation-obj",
-        choices=["negative", "zero", "global_zero", "layer_zero_all"],
+        choices=["negative", "zero", "global_zero", "layer_zero_all", "token_all_layers"],
         default="layer_zero_all",
         help="Activation objective for activation-GCG. "
              "'layer_zero_all' (default) minimizes projection magnitude across all tokens at the chosen layer; "
+             "'token_all_layers' minimizes projection magnitude at the chosen token across all layers; "
              "'zero' minimizes at a single (layer,pos); 'global_zero' minimizes across all layers/tokens; "
              "'negative' pushes projection negative at (layer,pos).",
     )
     p.add_argument(
         "--activation-score-mode",
-        choices=["global", "local"],
+        choices=["global", "local", "token_all_layers"],
         default="global",
         help="Scoring mode for activation-GCG candidate selection. "
-             "'global' (default) scores candidates using the same all-layer/token objective; "
-             "'local' uses only the canonical (layer,pos) projection.",
+             "'global' scores candidates over all layers/tokens; "
+             "'local' uses only the canonical (layer,pos); "
+             "'token_all_layers' aggregates across all layers at the chosen token.",
     )
     p.add_argument(
         "--conversation-template",
@@ -193,6 +195,12 @@ def run_activation_gcg(args, direction, layer, pos, conversation_template):
 
     managers = {"AP": ActAttackPrompt, "PM": ActPromptManager, "MPA": ActMultiPromptAttack}
 
+    score_mode = (
+        "token_all_layers"
+        if args.activation_obj == "token_all_layers"
+        else args.activation_score_mode
+    )
+
     attack = ActMultiPromptAttack(
         goals,
         targets,
@@ -201,7 +209,7 @@ def run_activation_gcg(args, direction, layer, pos, conversation_template):
         layer=layer,
         pos=pos,
         act_obj=args.activation_obj,
-        score_mode=args.activation_score_mode,
+        score_mode=score_mode,
         control_init="! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! !",
         managers=managers,
     )
