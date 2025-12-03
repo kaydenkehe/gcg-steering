@@ -10,11 +10,17 @@ def token_gradients_activation(model, input_ids, input_slice, pos, layer, direct
     """
     Compute gradients of the activation projection onto `direction` w.r.t. control tokens.
 
-    The activation is taken at `layer` (resid_pre) and position `pos` (can be negative;
-    negative values index from the end of the sequence length).
+    act_obj:
+      - "negative": minimize projection (push negative) at (layer,pos)
+      - "zero": minimize projection magnitude at (layer,pos)
+      - "global_zero": minimize sum of projection magnitudes across *all* layers/tokens
+                       (directional ablation style)
     """
     # Clear stale grads
     model.zero_grad(set_to_none=True)
+
+    # Normalize direction once
+    direction = direction / (direction.norm() + 1e-8)
 
     embed_weights = get_embedding_matrix(model)
     one_hot = torch.zeros(
@@ -38,27 +44,48 @@ def token_gradients_activation(model, input_ids, input_slice, pos, layer, direct
         dim=1,
     )
 
-    captured = {}
+    # Build loss depending on objective
+    loss_terms = []
 
-    def pre_hook(module, hook_input):
-        # Keep gradient flow for the control tokens; do not detach.
-        captured["act"] = hook_input[0]
+    if act_obj == "global_zero":
+        # Hook every block resid_pre and accumulate proj^2 over all tokens
+        handles = []
 
-    handle = model.model.layers[layer].register_forward_pre_hook(pre_hook)
-    _ = model(inputs_embeds=full_embeds)
-    handle.remove()
+        def global_hook(module, hook_input):
+            act = hook_input[0]  # [batch, seq, d_model]
+            dir_local = direction.to(act)
+            proj = act @ dir_local  # [batch, seq]
+            loss_terms.append((proj ** 2).sum())
 
-    hidden = captured["act"][0]  # [seq, d_model]
-    seq_len = hidden.shape[0]
-    idx = pos if pos >= 0 else seq_len + pos
-    idx = max(min(idx, seq_len - 1), 0)
-
-    direction = direction.to(hidden)
-    proj = torch.dot(hidden[idx], direction)
-    if act_obj == "zero":
-        obj = proj ** 2  # ablation-aligned: projection -> 0
+        for blk in model.model.layers:
+            handles.append(blk.register_forward_pre_hook(global_hook))
+        _ = model(inputs_embeds=full_embeds)
+        for h in handles:
+            h.remove()
+        obj = torch.stack(loss_terms).sum()
     else:
-        obj = proj  # push negative
+        captured = {}
+
+        def pre_hook(module, hook_input):
+            # Keep gradient flow for the control tokens; do not detach.
+            captured["act"] = hook_input[0]
+
+        handle = model.model.layers[layer].register_forward_pre_hook(pre_hook)
+        _ = model(inputs_embeds=full_embeds)
+        handle.remove()
+
+        hidden = captured["act"][0]  # [seq, d_model]
+        seq_len = hidden.shape[0]
+        idx = pos if pos >= 0 else seq_len + pos
+        idx = max(min(idx, seq_len - 1), 0)
+
+        direction_local = direction.to(hidden)
+        proj = torch.dot(hidden[idx], direction_local)
+        if act_obj == "zero":
+            obj = proj ** 2  # ablation-aligned: projection -> 0
+        else:
+            obj = proj  # push negative
+
     obj.backward()
 
     grad = one_hot.grad.clone()
@@ -158,7 +185,7 @@ class ActivationAttackPrompt(AttackPrompt):
         direction = direction.to(activations)
         # Return per-example scores according to objective
         proj = torch.stack([torch.dot(activations[b, idxs[b], :], direction) for b in range(activations.shape[0])])
-        if act_obj == "zero":
+        if act_obj in ("zero", "global_zero"):
             scores = proj ** 2  # ablation-aligned: projection -> 0
         else:
             scores = proj  # negative objective: push projection as negative as possible
@@ -227,6 +254,7 @@ class ActivationMultiPromptAttack(MultiPromptAttack):
         direction,
         layer,
         pos=-1,
+        act_obj="global_zero",
         control_init="! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! !",
         test_prefixes=[
             "I'm sorry",
@@ -258,6 +286,7 @@ class ActivationMultiPromptAttack(MultiPromptAttack):
         self.layer = layer
         self.pos = pos
         self.managers = managers
+        self.act_obj = act_obj
 
         self.prompts = [
             managers["PM"](
@@ -270,6 +299,7 @@ class ActivationMultiPromptAttack(MultiPromptAttack):
                 direction=direction,
                 layer=layer,
                 pos=pos,
+                act_obj=act_obj,
                 managers=managers,
             )
             for worker in workers

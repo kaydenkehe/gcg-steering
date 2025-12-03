@@ -70,6 +70,14 @@ def parse_args():
     p.add_argument("--device", default="cuda:0")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument(
+        "--activation-obj",
+        choices=["negative", "zero", "global_zero"],
+        default="global_zero",
+        help="Activation objective for activation-GCG. "
+             "'global_zero' (default) minimizes projection magnitude across all layers/tokens; "
+             "'zero' minimizes at a single (layer,pos); 'negative' pushes projection negative at (layer,pos).",
+    )
+    p.add_argument(
         "--conversation-template",
         default=None,
         help="FastChat conversation template name (defaults inferred from model-path: llama-2 or gemma)",
@@ -173,9 +181,9 @@ def run_activation_gcg(args, direction, layer, pos, conversation_template):
         direction=direction,
         layer=layer,
         pos=pos,
+        act_obj=args.activation_obj,
         control_init="! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! !",
         managers=managers,
-        act_obj="negative",  # default: drive projection negative (compliance direction)
     )
     suffix, loss = attack.run(
         n_steps=args.n_steps,
