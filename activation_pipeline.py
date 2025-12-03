@@ -64,8 +64,18 @@ def parse_args():
     p.add_argument("--topk", type=int, default=256)
     p.add_argument("--temp", type=float, default=1.0)
     p.add_argument("--allow-non-ascii", action="store_true", default=False)
-    p.add_argument("--run-gcg-baseline", action=argparse.BooleanOptionalAction, default=True)
-    p.add_argument("--run-ablation-baseline", action=argparse.BooleanOptionalAction, default=True)
+    p.add_argument(
+        "--run-gcg-baseline",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Whether to run the standard GCG baseline (disabled by default).",
+    )
+    p.add_argument(
+        "--run-ablation-baseline",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Whether to run the directional ablation baseline (disabled by default).",
+    )
     p.add_argument("--disable-llamaguard", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--device", default="cuda:0")
     p.add_argument("--seed", type=int, default=42)

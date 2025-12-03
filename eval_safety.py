@@ -30,8 +30,12 @@ def parse_args():
     )
     p.add_argument(
         "--variants",
-        default="baseline,activation_gcg,gcg,ablation",
-        help="Comma-separated list of variants to evaluate (include 'baseline' for no-suffix completions)",
+        default="baseline,activation_gcg",
+        help=(
+            "Comma-separated list of variants to evaluate "
+            "(include 'baseline' for no-suffix completions). "
+            "Add 'gcg' and/or 'ablation' explicitly if you have those outputs."
+        ),
     )
     p.add_argument(
         "--methods",
