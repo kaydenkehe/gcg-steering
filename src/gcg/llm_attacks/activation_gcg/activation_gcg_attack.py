@@ -48,13 +48,16 @@ def token_gradients_activation(model, input_ids, input_slice, pos, layer, direct
     loss_terms = []
 
     if act_obj == "global_zero":
-        # Hook every block resid_pre and accumulate proj^2 over all tokens
+        # Hook every block resid_pre and accumulate proj^2 over all tokens.
+        # Compute the loss in float32 and average over all (layer, token) pairs
+        # to keep scales reasonable and avoid fp16 overflow.
         handles = []
 
         def global_hook(module, hook_input):
             act = hook_input[0]  # [batch, seq, d_model]
-            dir_local = direction.to(act)
-            proj = act @ dir_local  # [batch, seq]
+            act32 = act.to(torch.float32)
+            dir32 = direction.to(act32)
+            proj = act32 @ dir32  # [batch, seq]
             loss_terms.append((proj ** 2).sum())
 
         for blk in model.model.layers:
@@ -62,7 +65,10 @@ def token_gradients_activation(model, input_ids, input_slice, pos, layer, direct
         _ = model(inputs_embeds=full_embeds)
         for h in handles:
             h.remove()
-        obj = torch.stack(loss_terms).sum()
+        if not loss_terms:
+            raise RuntimeError("global_zero objective: no activations captured.")
+        total_positions = len(loss_terms) * full_embeds.shape[1]  # num_layers * seq_len (batch assumed 1)
+        obj = torch.stack(loss_terms).sum() / total_positions
     else:
         captured = {}
 
