@@ -15,6 +15,7 @@ def token_gradients_activation(model, input_ids, input_slice, pos, layer, direct
       - "zero": minimize projection magnitude at (layer,pos)
       - "global_zero": minimize sum of projection magnitudes across *all* layers/tokens
                        (directional ablation style)
+      - "layer_zero_all": minimize projection magnitudes for *all tokens* at the specified layer
     """
     # Clear stale grads
     model.zero_grad(set_to_none=True)
@@ -69,6 +70,21 @@ def token_gradients_activation(model, input_ids, input_slice, pos, layer, direct
             raise RuntimeError("global_zero objective: no activations captured.")
         total_positions = len(loss_terms) * full_embeds.shape[1]  # num_layers * seq_len (batch assumed 1)
         obj = torch.stack(loss_terms).sum() / total_positions
+    elif act_obj == "layer_zero_all":
+        # Single-layer directional ablation across all tokens
+        captured = {}
+
+        def layer_hook(module, hook_input):
+            captured["act"] = hook_input[0]
+
+        handle = model.model.layers[layer].register_forward_pre_hook(layer_hook)
+        _ = model(inputs_embeds=full_embeds)
+        handle.remove()
+
+        hidden = captured["act"][0].to(torch.float32)  # [seq, d_model]
+        dir32 = direction.to(hidden)
+        proj = hidden @ dir32  # [seq]
+        obj = (proj ** 2).mean()  # mean across all tokens at this layer
     else:
         captured = {}
 
@@ -97,6 +113,8 @@ def token_gradients_activation(model, input_ids, input_slice, pos, layer, direct
     grad = one_hot.grad.clone()
     if act_obj == "global_zero":
         del embeds, full_embeds, input_embeds, one_hot
+    elif act_obj == "layer_zero_all":
+        del embeds, full_embeds, input_embeds, one_hot, hidden, captured
     else:
         del embeds, full_embeds, input_embeds, one_hot, hidden, captured
     gc.collect()
@@ -182,7 +200,7 @@ class ActivationAttackPrompt(AttackPrompt):
                 act32 = act.to(torch.float32)
                 dir32 = direction.to(act32) / (direction.norm() + 1e-8)
                 proj = act32 @ dir32  # [batch, seq]
-                if act_obj in ("zero", "global_zero"):
+                if act_obj in ("zero", "global_zero", "layer_zero_all"):
                     term = (proj ** 2).sum(dim=1)  # [batch]
                 else:
                     term = proj.sum(dim=1)  # [batch]
@@ -216,25 +234,34 @@ class ActivationAttackPrompt(AttackPrompt):
             lengths = attn_mask.sum(-1) if attn_mask is not None else torch.tensor(
                 [ids.shape[1]] * ids.shape[0], device=ids.device
             )
-            idxs = []
-            for b in range(activations.shape[0]):
-                seq_len = int(lengths[b].item())
-                idx = pos if pos >= 0 else seq_len + pos
-                idx = max(min(idx, seq_len - 1), 0)
-                idxs.append(idx)
-            idxs = torch.tensor(idxs, device=activations.device)
-
             # Compute projections in float32 to avoid overflow/inf
             act32 = activations.to(torch.float32)
             dir32 = direction.to(act32) / (direction.norm() + 1e-8)
-            # Return per-example scores according to objective
-            proj = torch.stack(
-                [torch.dot(act32[b, idxs[b], :], dir32) for b in range(act32.shape[0])]
-            )
-            if act_obj in ("zero", "global_zero"):
-                scores = proj ** 2  # ablation-aligned: projection -> 0
+            if act_obj == "layer_zero_all":
+                proj = act32 @ dir32  # [batch, seq]
+                if attn_mask is not None:
+                    mask = attn_mask.to(proj.dtype)
+                    proj_sq = (proj ** 2) * mask
+                    scores = proj_sq.sum(dim=1) / mask.sum(dim=1).clamp_min(1e-8)
+                else:
+                    scores = (proj ** 2).mean(dim=1)
             else:
-                scores = proj  # negative objective: push projection as negative as possible
+                idxs = []
+                for b in range(activations.shape[0]):
+                    seq_len = int(lengths[b].item())
+                    idx = pos if pos >= 0 else seq_len + pos
+                    idx = max(min(idx, seq_len - 1), 0)
+                    idxs.append(idx)
+                idxs = torch.tensor(idxs, device=activations.device)
+
+                # Return per-example scores according to objective
+                proj = torch.stack(
+                    [torch.dot(act32[b, idxs[b], :], dir32) for b in range(act32.shape[0])]
+                )
+                if act_obj in ("zero", "global_zero"):
+                    scores = proj ** 2  # ablation-aligned: projection -> 0
+                else:
+                    scores = proj  # negative objective: push projection as negative as possible
 
             del ids, locs, test_ids, activations, act32, dir32, captured
             gc.collect()
@@ -302,8 +329,8 @@ class ActivationMultiPromptAttack(MultiPromptAttack):
         direction,
         layer,
         pos=-1,
-        act_obj="global_zero",
-        score_mode="global",
+        act_obj="layer_zero_all",
+        score_mode="local",
         control_init="! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! !",
         test_prefixes=[
             "I'm sorry",

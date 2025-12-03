@@ -81,11 +81,12 @@ def parse_args():
     p.add_argument("--seed", type=int, default=42)
     p.add_argument(
         "--activation-obj",
-        choices=["negative", "zero", "global_zero"],
-        default="global_zero",
+        choices=["negative", "zero", "global_zero", "layer_zero_all"],
+        default="layer_zero_all",
         help="Activation objective for activation-GCG. "
-             "'global_zero' (default) minimizes projection magnitude across all layers/tokens; "
-             "'zero' minimizes at a single (layer,pos); 'negative' pushes projection negative at (layer,pos).",
+             "'layer_zero_all' (default) minimizes projection magnitude across all tokens at the chosen layer; "
+             "'zero' minimizes at a single (layer,pos); 'global_zero' minimizes across all layers/tokens; "
+             "'negative' pushes projection negative at (layer,pos).",
     )
     p.add_argument(
         "--activation-score-mode",
