@@ -227,7 +227,8 @@ class ActivationAttackPrompt(AttackPrompt):
             def global_hook(module, hook_input):
                 act = hook_input[0]  # [batch, seq, d_model]
                 act32 = act.to(torch.float32)
-                dir32 = direction.to(act32) / (direction.norm() + 1e-8)
+                dir32 = direction.to(act32)
+                dir32 = dir32 / (dir32.norm() + 1e-8)
                 proj = act32 @ dir32  # [batch, seq]
                 if act_obj in ("zero", "global_zero", "layer_zero_all"):
                     term = (proj ** 2).sum(dim=1)  # [batch]
@@ -277,7 +278,8 @@ class ActivationAttackPrompt(AttackPrompt):
                 idxs.append(idx)
             idxs = torch.tensor(idxs, device=ids.device)
 
-            dir32 = direction.to(ids.device) / (direction.norm() + 1e-8)
+            dir32 = direction.to(ids.device)
+            dir32 = dir32 / (dir32.norm() + 1e-8)
             proj_sq_layers = []
             for act in layer_acts:
                 act32 = act.to(torch.float32)
@@ -305,7 +307,8 @@ class ActivationAttackPrompt(AttackPrompt):
             )
             # Compute projections in float32 to avoid overflow/inf
             act32 = activations.to(torch.float32)
-            dir32 = direction.to(act32) / (direction.norm() + 1e-8)
+            dir32 = direction.to(act32)
+            dir32 = dir32 / (dir32.norm() + 1e-8)
             if act_obj == "layer_zero_all":
                 proj = act32 @ dir32  # [batch, seq]
                 if attn_mask is not None:
