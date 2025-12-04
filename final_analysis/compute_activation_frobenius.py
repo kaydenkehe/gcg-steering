@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
-Compute normalized Frobenius distances between suffix-induced activations and
-refusal-direction ablated activations across all layers/tokens.
+Compute Frobenius distances between suffix-induced activations and their
+refusal-direction ablated counterparts across all layers/tokens.
 
 For each example:
-  D = ||H_suffix - H_ablation||_F / ||H_baseline - H_ablation||_F
+  D = ||H_suffix - H_suffix_ablation||_F
 where H_* are stacked resid_pre activations (layers x seq x d) captured during a
-single forward pass. Sequences are truncated to the minimum length across the
-three variants for a fair comparison.
+single forward pass. Sequences are truncated to the minimum length within each
+pair (variant vs variant_ablation) for a fair comparison.
 
 Outputs:
-  final_analysis/activation_distances.json (by default) with per-method stats.
+  final_analysis/activation_distances.json (by default) with per-method stats:
+    mean_distance, median_distance, distances (per example).
 
 Example:
   python final_analysis/compute_activation_frobenius.py \
@@ -149,39 +150,34 @@ def main():
         for row in harmful:
             instr = row["instruction"]
 
-            inp_base = build_inputs(model_base, instr, suffix="")
-            inp_suffix = build_inputs(model_base, instr, suffix=suffix)
+            # Variant inputs (with suffix) and baseline inputs (no suffix)
+            inp_var = build_inputs(model_base, instr, suffix=suffix)
 
-            acts_base = capture_resid_pre(model_base, inp_base, pre_hooks=[])
-            acts_ablation = capture_resid_pre(model_base, inp_base, pre_hooks=ablation_pre)
-            acts_suffix = capture_resid_pre(model_base, inp_suffix, pre_hooks=[])
+            # Capture activations with/without ablation for both variant and baseline
+            acts_var = capture_resid_pre(model_base, inp_var, pre_hooks=[])
+            acts_var_abl = capture_resid_pre(model_base, inp_var, pre_hooks=ablation_pre)
 
-            # Align sequence lengths
-            min_layers = min(len(acts_base), len(acts_ablation), len(acts_suffix))
-            acts_base = acts_base[:min_layers]
-            acts_ablation = acts_ablation[:min_layers]
-            acts_suffix = acts_suffix[:min_layers]
+            # Align layers
+            min_layers = min(len(acts_var), len(acts_var_abl))
+            acts_var = acts_var[:min_layers]
+            acts_var_abl = acts_var_abl[:min_layers]
 
-            H_base = stack_layers(acts_base)
-            H_ablation = stack_layers(acts_ablation)
-            H_suffix = stack_layers(acts_suffix)
+            H_var = stack_layers(acts_var)
+            H_var_abl = stack_layers(acts_var_abl)
 
-            # Align by sequence length
-            min_seq = min(H_base.shape[1], H_ablation.shape[1], H_suffix.shape[1])
-            H_base = H_base[:, :min_seq]
-            H_ablation = H_ablation[:, :min_seq]
-            H_suffix = H_suffix[:, :min_seq]
+            # Align sequence length within the pair
+            min_seq_var = min(H_var.shape[1], H_var_abl.shape[1])
+            H_var = H_var[:, :min_seq_var]
+            H_var_abl = H_var_abl[:, :min_seq_var]
 
-            num = frobenius_norm(H_suffix - H_ablation)
-            den = frobenius_norm(H_base - H_ablation)
-            ratio = float("inf") if den == 0 else num / den
-            ratios.append(ratio)
+            dist = frobenius_norm(H_var - H_var_abl)
+            ratios.append(dist)
 
         results[method] = {
             "n_examples": len(harmful),
-            "mean_ratio": sum(ratios) / len(ratios) if ratios else None,
-            "median_ratio": sorted(ratios)[len(ratios) // 2] if ratios else None,
-            "ratios": ratios,
+            "mean_distance": sum(ratios) / len(ratios) if ratios else None,
+            "median_distance": sorted(ratios)[len(ratios) // 2] if ratios else None,
+            "distances": ratios,
         }
 
     with open(args.output, "w") as f:
@@ -191,4 +187,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
