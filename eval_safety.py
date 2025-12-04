@@ -42,6 +42,15 @@ def parse_args():
         default="substring_matching,llamaguard2,harmbench",
         help="Comma-separated list of methodologies for evaluate_jailbreak",
     )
+    p.add_argument(
+        "--split",
+        choices=["harmful", "harmless", "both"],
+        default="harmful",
+        help=(
+            "Which completions to evaluate: 'harmful', 'harmless', or 'both'. "
+            "Default is 'harmful'."
+        ),
+    )
     return p.parse_args()
 
 
@@ -65,23 +74,27 @@ def main():
         harm_path = os.path.join(completions_dir, f"{variant}_harmful.json")
         harmless_path = os.path.join(completions_dir, f"{variant}_harmless.json")
 
-        if not os.path.exists(harm_path) or not os.path.exists(harmless_path):
-            print(f"[{variant}] Skipping: missing completions files in {completions_dir}")
-            continue
+        if args.split in ("harmful", "both"):
+            if os.path.exists(harm_path):
+                print(f"[{variant}] Evaluating harmful completions with {methods} ...")
+                evaluate_jailbreak(
+                    completions_path=harm_path,
+                    methodologies=methods,
+                    evaluation_path=os.path.join(args.output_dir, f"{variant}_harmful_eval_safety.json"),
+                )
+            else:
+                print(f"[{variant}] Skipping harmful: missing {harm_path}")
 
-        print(f"[{variant}] Evaluating harmful completions with {methods} ...")
-        evaluate_jailbreak(
-            completions_path=harm_path,
-            methodologies=methods,
-            evaluation_path=os.path.join(args.output_dir, f"{variant}_harmful_eval_safety.json"),
-        )
-
-        print(f"[{variant}] Evaluating harmless completions with {methods} ...")
-        evaluate_jailbreak(
-            completions_path=harmless_path,
-            methodologies=methods,
-            evaluation_path=os.path.join(args.output_dir, f"{variant}_harmless_eval_safety.json"),
-        )
+        if args.split in ("harmless", "both"):
+            if os.path.exists(harmless_path):
+                print(f"[{variant}] Evaluating harmless completions with {methods} ...")
+                evaluate_jailbreak(
+                    completions_path=harmless_path,
+                    methodologies=methods,
+                    evaluation_path=os.path.join(args.output_dir, f"{variant}_harmless_eval_safety.json"),
+                )
+            else:
+                print(f"[{variant}] Skipping harmless: missing {harmless_path}")
 
 
 if __name__ == "__main__":
