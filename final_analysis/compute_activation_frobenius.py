@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """
-Compute Frobenius distances between suffix-induced activations and their
+Compute cosine similarity between suffix-induced activations and their
 refusal-direction ablated counterparts across all layers/tokens.
 
-For each example:
-  D = ||H_suffix - H_suffix_ablation||_F
+For each example, we flatten H tensors and compute:
+  cos = <H_suffix, H_suffix_ablation> /
+        (||H_suffix|| * ||H_suffix_ablation||)
 where H_* are stacked resid_pre activations (layers x seq x d) captured during a
 single forward pass. Sequences are truncated to the minimum length within each
 pair (variant vs variant_ablation) for a fair comparison.
 
 Outputs:
   final_analysis/activation_distances.json (by default) with per-method stats:
-    mean_distance, median_distance, distances (per example).
+    mean_cosine, median_cosine, cosine_values (per example).
 
 Example:
   python final_analysis/compute_activation_frobenius.py \
@@ -119,8 +120,16 @@ def stack_layers(layer_acts: List[torch.Tensor]) -> torch.Tensor:
     return torch.stack(trimmed, dim=0)  # [layers, seq, d]
 
 
-def frobenius_norm(t: torch.Tensor) -> float:
-    return torch.linalg.norm(t.reshape(-1), ord=2).item()
+def cosine_similarity(a: torch.Tensor, b: torch.Tensor) -> float:
+    v1 = a.reshape(-1)
+    v2 = b.reshape(-1)
+    # Guard against zero vectors
+    n1 = torch.linalg.norm(v1)
+    n2 = torch.linalg.norm(v2)
+    denom = (n1 * n2).item()
+    if denom == 0.0:
+        return 0.0
+    return float(torch.dot(v1, v2).item() / denom)
 
 
 def main():
@@ -146,7 +155,7 @@ def main():
 
     for method, suffix in variants:
         print(f"Evaluating {method} ...")
-        ratios = []
+        sims = []
         for row in harmful:
             instr = row["instruction"]
 
@@ -170,14 +179,14 @@ def main():
             H_var = H_var[:, :min_seq_var]
             H_var_abl = H_var_abl[:, :min_seq_var]
 
-            dist = frobenius_norm(H_var - H_var_abl)
-            ratios.append(dist)
+            sim = cosine_similarity(H_var, H_var_abl)
+            sims.append(sim)
 
         results[method] = {
             "n_examples": len(harmful),
-            "mean_distance": sum(ratios) / len(ratios) if ratios else None,
-            "median_distance": sorted(ratios)[len(ratios) // 2] if ratios else None,
-            "distances": ratios,
+            "mean_cosine": sum(sims) / len(sims) if sims else None,
+            "median_cosine": sorted(sims)[len(sims) // 2] if sims else None,
+            "cosine_values": sims,
         }
 
     with open(args.output, "w") as f:
