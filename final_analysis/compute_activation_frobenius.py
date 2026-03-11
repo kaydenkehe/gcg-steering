@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
 """
-Compute cosine similarity between suffix-induced activations and their
-refusal-direction ablated counterparts across all layers/tokens.
+Compute both cosine similarity and Frobenius distance between suffix-induced
+activations and their refusal-direction ablated counterparts across all
+layers/tokens.
 
 For each example, we flatten H tensors and compute:
   cos = <H_suffix, H_suffix_ablation> /
         (||H_suffix|| * ||H_suffix_ablation||)
+  dist = ||H_suffix - H_suffix_ablation||_F
 where H_* are stacked resid_pre activations (layers x seq x d) captured during a
 single forward pass. Sequences are truncated to the minimum length within each
 pair (variant vs variant_ablation) for a fair comparison.
 
 Outputs:
   final_analysis/activation_distances.json (by default) with per-method stats:
-    mean_cosine, median_cosine, cosine_values (per example).
+    mean_cosine, median_cosine, cosine_values (per example),
+    mean_distance, median_distance, distances (per example).
 
 Example:
   python final_analysis/compute_activation_frobenius.py \
@@ -156,6 +159,7 @@ def main():
     for method, suffix in variants:
         print(f"Evaluating {method} ...")
         sims = []
+        dists = []
         for row in harmful:
             instr = row["instruction"]
 
@@ -180,13 +184,18 @@ def main():
             H_var_abl = H_var_abl[:, :min_seq_var]
 
             sim = cosine_similarity(H_var, H_var_abl)
+            dist = torch.linalg.norm((H_var - H_var_abl).reshape(-1), ord=2).item()
             sims.append(sim)
+            dists.append(dist)
 
         results[method] = {
             "n_examples": len(harmful),
             "mean_cosine": sum(sims) / len(sims) if sims else None,
             "median_cosine": sorted(sims)[len(sims) // 2] if sims else None,
             "cosine_values": sims,
+            "mean_distance": sum(dists) / len(dists) if dists else None,
+            "median_distance": sorted(dists)[len(dists) // 2] if dists else None,
+            "distances": dists,
         }
 
     with open(args.output, "w") as f:
